@@ -258,10 +258,15 @@ ParallelPreprocess <- function(
               is.vector(fnames) && is.character(fnames) && !is.list(fnames) &&
               length(fnames)>0)
   stopifnot('Some files in `fnames` are missing' = all(file.exists(fnames)))
-  stopifnot('Some file paths in `fnames` are duplicates' =
-              all(!duplicated(fnames)))
-  stopifnot('Some file names (without paths) in `fnames` are duplicates' =
-              all(!duplicated(basename(fnames))))
+  
+  if (Sys.getenv('DUPLICATE_EXCEPTION')!='TRUE') {
+    
+    stopifnot('Some file paths in `fnames` are duplicates' =
+                all(!duplicated(fnames)))
+    stopifnot('Some file names (without paths) in `fnames` are duplicates' =
+                all(!duplicated(basename(fnames))))
+  }
+  
   stopifnot('Some files in `fnames` are not FCS files' =
               tolower(substr(fnames, nchar(fnames)-3, nchar(fnames))) == '.fcs')
   stopifnot('`fpath_out` must be a single string' =

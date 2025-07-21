@@ -81,9 +81,13 @@ ParallelAggregate <- function(
               is.vector(fnames) && is.character(fnames) && !is.list(fnames) &&
               length(fnames)>0)
   stopifnot('Some files in `fnames` are missing' = all(file.exists(fnames)))
-  stopifnot('Some files in `fnames` are duplicates' = all(!duplicated(fnames)))
-  stopifnot('Some files in `fnames` are not FCS files' =
-              tolower(substr(fnames, nchar(fnames)-3, nchar(fnames))) == '.fcs')
+  
+  if (Sys.getenv('DUPLICATE_EXCEPTION')!='TRUE') {
+    
+    stopifnot('Some files in `fnames` are duplicates' = all(!duplicated(fnames)))
+    stopifnot('Some files in `fnames` are not FCS files' =
+                tolower(substr(fnames, nchar(fnames)-3, nchar(fnames))) == '.fcs')
+  }
   stopifnot('`N` must be NULL, Inf or integer greater than 2' =
               is.null(N) ||
               (is.infinite(N) && length(N)==1) ||
