@@ -4,7 +4,7 @@ Title: Fast parallelised functions for cytometry data analysis
 Version: 0.1.0
 Author: David Novak
 Maintainer: David Novak <davidnovak9000@gmail.com>
-Description: Uses Simple Network Of Workstations (SNOW) cluster computing to provide faster-performing analogues of some FlowSOM and CytoNorm functions.
+Description: Uses Simple Network Of Workstations (SNOW) cluster computing to accelerate computational cytometry workflows.
 License: Apache License 2.0
 Encoding: UTF-8
 LazyData: true
