@@ -301,8 +301,8 @@ ParallelPreprocess <- function(
   if (!is.null(tf_list)) {
     stopifnot(
       'If specified, `tf_list` must be a flowCore::transformList' = 
-       class(translist)=='transformList' &&
-       attr(class(translist), 'package')=='flowCore'
+       class(tf_list)=='transformList' &&
+       attr(class(tf_list), 'package')=='flowCore'
     )
     stopifnot(
       'Some channels specified in `tf_list` were not found in the panel' =
