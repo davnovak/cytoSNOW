@@ -123,10 +123,14 @@ ParallelGetFeatures <- function(
       'If specified, `sample_names` must be of the same length as `fnames' =
         length(sample_names)==length(fnames)
     )
-    stopifnot(
-      'If specified, `sample_names` must not contain duplicates' =
-        length(unique(sample_names))==length(sample_names)
-    )
+    
+    if (Sys.getenv('DUPLICATE_EXCEPTION')!='TRUE') {
+      
+      stopifnot(
+        'If specified, `sample_names` must not contain duplicates' =
+          length(unique(sample_names))==length(sample_names)
+      )
+    }
   } else {
     sample_names <- fnames
   }
