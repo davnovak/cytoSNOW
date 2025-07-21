@@ -472,6 +472,9 @@ ParallelPreprocess <- function(
     close(pb)
   }
   stopCluster(clu)
+  invisible(gc())
+  rm(clu)
+  invisible(gc())
 
   return(invisible(NULL))
 }

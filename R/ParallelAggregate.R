@@ -265,6 +265,9 @@ ParallelAggregate <- function(
     close(pb)
   }
   stopCluster(cl)
+  invisible(gc())
+  rm(cl)
+  invisible(gc())
 
   ## Convert to flowFrame if requested
 

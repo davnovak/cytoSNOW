@@ -430,6 +430,9 @@ ParallelGetFeatures <- function(
     close(pb)
   }
   stopCluster(clu)
+  invisible(gc())
+  rm(clu)
+  invisible(gc())
 
   ## Resolve row order and names
 
