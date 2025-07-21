@@ -1,0 +1,21 @@
+Package: cytoSNOW
+Type: Package
+Title: Fast parallelised functions for cytometry data analysis
+Version: 0.1.0
+Author: David Novak
+Maintainer: David Novak <davidnovak9000@gmail.com>
+Description: Uses Simple Network Of Workstations (SNOW) cluster computing to provide faster-performing analogues of some FlowSOM and CytoNorm functions.
+License: Apache License 2.0
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Depends:
+    R (>= 3.2)
+Imports:
+    flowCore (>= 2.14.2),
+    FlowSOM (>= 2.11.2),
+    CytoNorm (>= 2.0.1),
+    snow (>= 0.4.4),
+    doSNOW (>= 1.0.20),
+    foreach (>= 1.5.2)

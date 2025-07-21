@@ -1,0 +1,7 @@
+
+export("ParallelAggregate")
+export("ParallelGetFeatures")
+export("GetPanels")
+export("ValidateFCS")
+export("MatchChannels")
+export("ParallelPreprocess")
