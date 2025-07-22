@@ -148,8 +148,10 @@ ParallelGetFeatures <- function(
   stopifnot('`verbose` must be a single logical' =
               is.logical(verbose) && length(verbose)==1)
 
-  channels <- as.vector(colnames(fsom$map$codes))
-  markers  <- as.vector(FlowSOM::GetMarkers(fsom, channels))
+  fsom_channels <- as.vector(colnames(fsom$map$codes))
+  fsom_markers  <- as.vector(FlowSOM::GetMarkers(fsom, fsom_channels))
+  channels <- flowCore::colnames(ff)
+  markers  <- flowCore::markernames(ff)[channels]
 
   if (!is.null(state_markers)) {
     state_map <- pmatch(state_markers, markers)
@@ -294,7 +296,7 @@ ParallelGetFeatures <- function(
     ## Get (meta)cluster mappings
 
     cl_map <- factor(FlowSOM:::MapDataToCodes(
-      codes = codes, newdata = expr, distf = 2
+      codes = codes, newdata = expr[, fsom_channels, drop = FALSE], distf = 2
     )[, 1], levels = seq_len(n_cl))
 
     if (mcl) {
