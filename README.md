@@ -37,7 +37,7 @@ You can view the documentation using ```?cytoSNOW:::NameOfFunction```.
 
 <details>
 <summary><b>Input data generation</b></summary>
-
+<br>
 We begin by generating a synthetic dataset of `N` samples (2000 by default).
 (In reality, we only create a single FCS file but reuse it, pretending there are 2000 of them.)
 
@@ -86,7 +86,7 @@ tf_list <- flowCore::transformList(
 </details>
 <details>
 <summary><b>Aggregation</b></summary>
-
+<br>
 The next step in the standard protocol is to aggregate expression data from all the pre-processed files, to obtain training data for the clustering model.
 
 ```r
@@ -98,7 +98,7 @@ This creates a 1-million-cell expression matrix that samples cells from all the 
 </details>
 <details>
 <summary><b>Clustering</b></summary>
-
+<br>
 *FlowSOM* clustering itself is actually very fast.
 Despite numerous approaches optimising this process to run faster, this is rarely the real bottleneck.
 
@@ -109,7 +109,7 @@ fsom <- FlowSOM::FlowSOM(agg1, nClus = 40, colsToUse = markers[idcs_type])
 </details>
 <details>
 <summary><b>Feature extraction</b></summary>
-
+<br>
 To be able to compare cell types and cell state across cytometry samples, we would typically use feature extraction as implemented in *FlowSOM*.
 Here, we accelerate the feature extraction process.
 
