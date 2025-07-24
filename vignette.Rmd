@@ -4,6 +4,7 @@ author: "David Novak"
 date: "2025-07-23"
 output:
   html_document:
+    theme: cosmo
     toc: true
     toc_float: true
 editor_options: 
@@ -23,10 +24,12 @@ Much of the recent progress is and will be fueled by better **standardisation** 
 Large cohorts of data present a range of challenges for computational cytometrists.
 From QC and pre-processing, through signal normalisation and cluster analyses, to differential expression modelling, **cytometry pipelines require tuning, and lots of it**.
 
-A large computational pipeline can require **hundreds of re-runs**, and close coordination of the data analyst with **domain experts** is a must.
+::: {style="border: 1px solid #4A90E2;      border-radius: 10px;              padding: 10px;                  background-color: #f0f8ff;      color: #333333;                 margin: 10px 0;"}
+A large computational pipeline can require **hundreds of re-runs**, and **close coordination of the data analyst with domain experts is a must**.
 
 When working with datasets from hundreds of donors/patients, **re-running the pipelines takes a great deal of computing power and time**.
-This makes computational cytometry work unaccessible if you don't have powerful hardware.
+This makes computational cytometry work inaccessible if you don't have powerful hardware.
+:::
 
 ## Aims of this project
 
@@ -38,8 +41,11 @@ I identified some of the bottlenecks in computational cytometry workflows (based
 As you can see, a number of steps in the workflow are major bottlenecks once the number of samples you're working with becomes high.
 **Luckily, I got a massive speed-up by rewriting some FlowSOM functions to work multi-threaded (using multiple CPU cores), as well as writing some new ones.**
 
-To make this easy to use for everyone, I created the [*cytoSNOW*](https://github.com/davnovak/cytoSNOW) R package.
-Each function in it is carefully documented, and it runs a number of sanity checks on the input parameters that allow you to spot potential errors easily.
+In practice, I took a pipeline that would otherwise run for 3 hours and 25 minutes on my computer and made it run in 44 minutes.
+
+::: {style="border: 1px solid #4A90E2;      border-radius: 10px;              padding: 10px;                  background-color: #f0f8ff;      color: #333333;                 margin: 10px 0;"}
+**To give everyone the opportunity to speed up their cytometry data analyses, I created the [*cytoSNOW*](https://github.com/davnovak/cytoSNOW) R package.** Each function in it is carefully documented, and it runs a number of sanity checks on the input parameters that allow you to spot potential errors easily.
+:::
 
 The focus of this case study is **speed of execution**.
 The code that I give below covers the creation of a large synthetic dataset and a standard computational workflow.
@@ -53,7 +59,7 @@ The running times with and without the use of *cytoSNOW* are ultimately compared
 
 The packages required for running the workflow itself are `flowCore`, `FlowSOM`, `cytoSNOW`, and `bench`.
 
-To plot a comparison of running times using a stacked bar plot, `tidyverse` and `ggtext`
+To plot a comparison of running times using a stacked bar plot, `tidyverse` and `ggtext` are also needed.
 
 The code was tested on a consumer laptop (MacBook Air M1 with 16GB RAM) with *cytoSNOW* using 7 CPU cores.
 
@@ -406,7 +412,34 @@ Saving time and resources is key.
 While existing R frameworks for parallel computing in bioinformatics, like `BiocParallel`, go a long way to do this, we need **cytometry-specific tools** that make it a no-brainer.
 
 In the future, I'd like to add functionality for **fast QC** (using *PeacoQC*, *flowAI*), **signal normalisation** (using *CytoNorm*), and **massive differential expression testing** (using *diffcyt*).
-I have done initial work on that in the [*iidx*](https://github.com/saeyslab/iidx)framework.
+I have done initial work on that in the [*iidx*](https://github.com/saeyslab/iidx) framework.
 
 There's work to be done to reduce the overhead associated with parallelising.
 There's also an obvious opportunity to use **distributed computing** here.
+
+## Alternatives to *cytoSNOW*
+
+There are great alternatives to (and relatives of) *cytoSNOW*, each with its own strengths.
+
+[`BiocParallel`](https://www.bioconductor.org/packages/devel/bioc/html/BiocParallel.html) is the go-to for general parallel evaluation compatible with Bioconductor objects.
+
+[`CATALYST`](https://www.bioconductor.org/packages/devel/bioc/html/CATALYST.html) supports parallelisation via `BiocParallel` for a number of steps, from pre-processing up to differential expression analysis.
+However, if you don't want to hold all data in memory, you have to manually chunk the data into multiple `SingleCellExperiment` objects to make things work.
+
+[`ncdfFlow`](https://www.bioconductor.org/packages/devel/bioc/html/ncdfFlow.html) can be used to address the memory issue here.
+However, in a real-life collaboration with domain experts (*e.g.*, immunologists), keeping FCS files as the format of choice (both of raw and pre-processed data) is easiest, and it avoids the need to load too much data into memory in the first place.
+
+::: {style="border: 1px solid #4A90E2;      border-radius: 10px;              padding: 10px;                  background-color: #f0f8ff;      color: #333333;                 margin: 10px 0;"}
+**My aim with *cytoSNOW* is to have a cytometry-specific solution that's extremely easy to deploy with close-to-zero overhead for the analyst to have things run in parallel.** And thus empower users with consumer-level hardware to do some great work with cytometry data!
+:::
+
+Did I miss an existing solution that you believe is better than mine?
+Please [**let me know**](https://davnovak.github.io/)–I'll be happy to see what the most efficient way forward is to advance the field.
+
+## Need help with your analyses?
+
+I'm a freelance bioinformatics consultant passionate about cytometry, single-cell transcriptomics, and many other modalities of data.
+
+::: {style="border: 1px solid #4A90E2;      border-radius: 10px;              padding: 10px;                  background-color: #f0f8ff;      color: #333333;                 margin: 10px 0;"}
+**If you need help with your project, [reach out](https://davnovak.github.io/)!** We'll figure out how my expertise can empower you or your team to get to results in a robust, transparent, and efficient way.
+:::
