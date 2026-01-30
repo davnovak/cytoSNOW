@@ -29,6 +29,7 @@
 #' use as the rownames of features matrices. Otherwise, `fnames` themselves are
 #' used. Defaults to NULL
 #' @param verbose logical. Whether to indicate progress. Defaults to TRUE
+#' @param ... optional additional named parameters for `flowCore::read.FCS`
 #'
 #' @details
 #' Two groups of features can be extracted: **abundance** features and **state**
@@ -70,7 +71,8 @@ ParallelGetFeatures <- function(
     thresholds      = NULL,
     cores           = parallel::detectCores()-1,
     sample_names    = NULL,
-    verbose         = TRUE
+    verbose         = TRUE,
+    ...
 ) {
 
   ## Validate inputs
@@ -150,6 +152,8 @@ ParallelGetFeatures <- function(
 
   fsom_channels <- as.vector(colnames(fsom$map$codes))
   fsom_markers  <- as.vector(FlowSOM::GetMarkers(fsom, fsom_channels))
+  
+  ff <- flowCore::read.FCS(fnames[1], ...)
   channels <- flowCore::colnames(ff)
   markers  <- flowCore::markernames(ff)[channels]
 
@@ -213,7 +217,7 @@ ParallelGetFeatures <- function(
         )
       } else NULL
     meds_mcl_comps <-
-      if (cl) {
+      if (mcl) {
         apply(
           X = expand.grid(state_markers, seq_len(n_mcl))[, c(2, 1)],
           MARGIN = 1, FUN = function(x) paste0('MC', as.numeric(x[1]), ' ', x[2])
@@ -229,7 +233,7 @@ ParallelGetFeatures <- function(
         )
       } else NULL
     pheno_mcl_comps <-
-      if (cl) {
+      if (mcl) {
         apply(
           X = expand.grid(names(thr_markers), seq_len(n_mcl))[, c(2, 1)],
           MARGIN = 1, FUN = function(x) paste0('MC', as.numeric(x[1]), ' ', x[2])
@@ -291,7 +295,7 @@ ParallelGetFeatures <- function(
   ) %dopar% {
 
     fname <- fnames[i]
-    expr <- flowCore::read.FCS(fname)[, channels, drop = FALSE]@exprs
+    expr <- flowCore::read.FCS(fname, ...)[, channels, drop = FALSE]@exprs
 
     ## Get (meta)cluster mappings
 
@@ -304,7 +308,18 @@ ParallelGetFeatures <- function(
     } else {
       mcl_map <- NULL
     }
-
+    
+    ## Initialise results
+    
+    cl_counts  <- NULL
+    cl_props   <- NULL
+    cl_meds    <- NULL
+    cl_pheno   <- NULL
+    mcl_counts <- NULL
+    mcl_props  <- NULL
+    mcl_meds   <- NULL
+    mcl_phen   <- NULL
+    
     ## Compute abundances
 
     if (abund) {
@@ -342,7 +357,7 @@ ParallelGetFeatures <- function(
                     if (nrow(d)==0) {
                       return(rep(NA, length(state_channels)))
                     }
-                    apply(d, 2, median)
+                    apply(d, 2, stats::median)
                   }
                 )
               ), nrow = 1),
@@ -380,9 +395,13 @@ ParallelGetFeatures <- function(
                     return(rep(NA, length(state_channels)))
                   }
                   apply(
-                    X = rbind(expr[cl_map==i, names(thr_channels), drop = FALSE], thr_channels),
+                    X = rbind(
+                      expr[cl_map==i, names(thr_channels), drop = FALSE],
+                      thr_channels
+                    ),
                     MARGIN = 2,
-                    FUN = function(x) sum(head(x, -1)>tail(x, 1))/(length(x)-1)
+                    FUN = function(x)
+                      sum(utils::head(x, -1)>utils::tail(x, 1))/(length(x)-1)
                   )
                 }
               )
@@ -402,9 +421,13 @@ ParallelGetFeatures <- function(
                     return(rep(NA, length(state_channels)))
                   }
                   apply(
-                    X = rbind(expr[mcl_map==i, names(thr_channels), drop = FALSE], thr_channels),
+                    X = rbind(
+                      expr[mcl_map==i, names(thr_channels), drop = FALSE],
+                      thr_channels
+                    ),
                     MARGIN = 2,
-                    FUN = function(x) sum(head(x, -1)>tail(x, 1))/(length(x)-1)
+                    FUN = function(x)
+                      sum(utils::head(x, -1)>utils::tail(x, 1))/(length(x)-1)
                   )
                 }
               )

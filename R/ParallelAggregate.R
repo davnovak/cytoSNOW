@@ -34,6 +34,7 @@
 #' @param metacluster integer. Metacluster number to extract events, if FlowSOM
 #' model is specified. Defaults to 1
 #' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
+#' @param ... optional additional named parameters for `flowCore::read.FCS`
 #'
 #' @details
 #' For a target aggregate size `N` and `n` FCS files, each `flowFrame`
@@ -72,7 +73,8 @@ ParallelAggregate <- function(
     guid            = 'Aggregate.fcs',
     fsom            = NULL,
     metacluster     = 1,
-    verbose         = TRUE
+    verbose         = TRUE,
+    ...
 ) {
 
   ## Validate inputs
@@ -238,9 +240,9 @@ ParallelAggregate <- function(
   ) %dopar% {
 
     if (!is.null(cols)&&length(cols)>0) {
-      d <- flowCore::read.FCS(fnames[i])[, cols, drop = FALSE]@exprs
+      d <- flowCore::read.FCS(fnames[i], ...)[, cols, drop = FALSE]@exprs
     } else {
-      d <- flowCore::read.FCS(fnames[i])@exprs
+      d <- flowCore::read.FCS(fnames[i], ...)@exprs
     }
     if (select_mc) {
       mc_idcs <- which(
@@ -273,7 +275,7 @@ ParallelAggregate <- function(
 
   if (as_flowFrame) {
 
-    ff <- flowCore::read.FCS(fnames[1], which.lines = 1)
+    ff <- flowCore::read.FCS(fnames[1], which.lines = 1, ...)
     if (!is.null(cols) && length(cols)>0) {
       ff <- ff[, cols, drop = FALSE]
       ff@exprs <- res[, cols, drop = FALSE]

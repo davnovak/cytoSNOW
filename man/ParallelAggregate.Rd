@@ -17,7 +17,8 @@ ParallelAggregate(
   guid = "Aggregate.fcs",
   fsom = NULL,
   metacluster = 1,
-  verbose = TRUE
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
@@ -60,6 +61,8 @@ Defaults to \code{NULL}}
 model is specified. Defaults to 1}
 
 \item{verbose}{logical. Whether to indicate progress. Defaults to \code{TRUE}}
+
+\item{...}{optional additional named parameters for \code{flowCore::read.FCS}}
 }
 \value{
 \code{flowCore::flowFrame} or matrix with named columns

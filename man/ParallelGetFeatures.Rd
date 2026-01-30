@@ -13,7 +13,8 @@ ParallelGetFeatures(
   thresholds = NULL,
   cores = parallel::detectCores() - 1,
   sample_names = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
@@ -47,6 +48,8 @@ use as the rownames of features matrices. Otherwise, \code{fnames} themselves ar
 used. Defaults to NULL}
 
 \item{verbose}{logical. Whether to indicate progress. Defaults to TRUE}
+
+\item{...}{optional additional named parameters for \code{flowCore::read.FCS}}
 }
 \value{
 list with named elements corresponding to matrices per requested

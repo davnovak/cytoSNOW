@@ -8,13 +8,16 @@
 #' confusion downstream.
 #'
 #' @param fnames string vector. Full paths to FCS files
+#' @param ... optional additional named parameters for 
+#' `flowCore::read.FCSheader`
 #'
 #' @return named `list` per file of `data.frame`s with columns *'Index'*,
 #' *'Channel'*, and *'Marker'*
 #'
 #' @export
 GetPanels <- function(
-  fnames
+  fnames,
+  ...
 ) {
 
   ## Validate inputs
@@ -31,7 +34,7 @@ GetPanels <- function(
                 tolower(substr(fnames, nchar(fnames)-3, nchar(fnames))) == '.fcs')
   }
 
-  headers <- flowCore::read.FCSheader(fnames)
+  headers <- flowCore::read.FCSheader(fnames, ...)
   res <- lapply(headers, function(h) {
     channels <- h[grepl('\\$P[0-9]+N$', names(h))]
     markers  <- h[grepl('\\$P[0-9]+S$', names(h))]

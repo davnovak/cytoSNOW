@@ -13,7 +13,8 @@ ParallelPreprocess(
   tf_list = NULL,
   tf_match = FALSE,
   cores = parallel::detectCores() - 1,
-  verbose = TRUE
+  verbose = TRUE,
+  ...
 )
 }
 \arguments{
@@ -44,12 +45,14 @@ Defaults to \code{FALSE}}
 least 2). Defaults to number of detectable cores minus 1}
 
 \item{verbose}{logical. Whether to indicate progress. Defaults to \code{TRUE}}
+
+\item{...}{optional additional named parameters for \code{flowCore::read.FCS}}
 }
 \value{
 nothing is returned
 }
 \description{
-Applies pre-processing (compensation and/or transformation) to FCS files.
+Applies pre-processing (compensation, and/or transformation) to FCS files.
 The pre-processed files are saved into a specified output directory.
 }
 \details{

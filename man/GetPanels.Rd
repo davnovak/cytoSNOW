@@ -4,10 +4,13 @@
 \alias{GetPanels}
 \title{Extract channels and markers from FCS files}
 \usage{
-GetPanels(fnames)
+GetPanels(fnames, ...)
 }
 \arguments{
 \item{fnames}{string vector. Full paths to FCS files}
+
+\item{...}{optional additional named parameters for
+\code{flowCore::read.FCSheader}}
 }
 \value{
 named \code{list} per file of \code{data.frame}s with columns \emph{'Index'},
