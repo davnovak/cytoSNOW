@@ -2,8 +2,12 @@
 
 *cytoSNOW* speeds up computational analyses of flow and mass cytometry data in R.
 Using the [`snow`](https://cran.r-project.org/web/packages/snow/index.html) framework, it runs essential components of these workflows using multiple CPU cores.
-This makes it possible to run things locally and **fast**.
+This makes it possible to run things **fast**.
+This is especially useful if you're running workflows **locally**, but *cytoSNOW* can power analyses **on high-performance computing (HPC) clusters** as well.
+
 I have written about an initial experiment with *cytoSNOW* in a blog post ([here](https://davnovak.github.io/docs/cytoSNOW/vignette.html)).
+
+<hr>
 
 Below are the tasks that *cytoSNOW* accelerates right now.
 The scope will be extended continuously.
