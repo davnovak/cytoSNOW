@@ -10,7 +10,7 @@ I have written about an initial experiment with *cytoSNOW* in a blog post ([here
 <hr>
 
 Below are the tasks that *cytoSNOW* accelerates right now.
-The scope will be extended continuously.
+The scope is being extended continuously: for instance, batch effect correction via *CytoNorm* will be included soon.
 
 | Task | Original implementation | Fast implementation |
 | :-- | :-- | :-- |
@@ -18,10 +18,8 @@ The scope will be extended continuously.
 | FCS file aggregation         | `FlowSOM::AggregateFlowFrames`             | `cytoSNOW::ParallelAggregate`   |
 | `FlowSOM` feature extraction | `FlowSOM::GetFeatures`                     | `cytoSNOW::ParallelGetFeatures` |
 
-*cytoSNOW* will speed up your analysis as long as you can use more than 1 CPU core on your machine.
-This is especially useful if you want to run the analysis locally, on your desktop or laptop.
-If you're running your analysis in a cloud, make sure you are using multiple CPU cores (otherwise *cytoSNOW* won't help).
-We will also add implementations and guidelines for accelerating workflows run on HPCs.
+*cytoSNOW* will speed up your analysis as long as you can use more than 1 CPU core.
+We'll include guidelines for use in cloud computing and with HPCs eventually.
 
 ## Installation
 
@@ -33,7 +31,7 @@ devtools::install_github('davnovak/cytoSNOW')
 
 ## Usage
 
-The vignette (`vignette.Rmd`) contains a nice walk-through that quantifies the speed-up brought about by using *cytoSNOW*.
+The vignette (`vignette.Rmd`) contains an easy walk-through that quantifies the speed-up brought about by using *cytoSNOW*.
 
 Alternatively, the code snippets below can be used to generate a synthetic large dataset and deploy a generic analytical workflow using *cytoSNOW*.
 The workflow is based on a standard *FlowSOM* protocol, as published [here](https://www.nature.com/articles/s41596-021-00550-0).
