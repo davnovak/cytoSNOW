@@ -35,7 +35,7 @@ Alternatively, the code snippets below can be used to generate a synthetic large
 The workflow is based on a standard *FlowSOM* protocol, as published [here](https://www.nature.com/articles/s41596-021-00550-0).
 
 Each *cytoSNOW* function used below is carefully documented.
-You can view the documentation using ```?cytoSNOW:::NameOfFunction```.
+You can view the documentation using ```?cytoSNOW::NameOfFunction```.
 
 <details>
 <summary><b>Input data generation</b></summary>
