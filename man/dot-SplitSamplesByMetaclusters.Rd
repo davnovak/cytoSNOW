@@ -7,6 +7,7 @@
 .SplitSamplesByMetaclusters(
   fnames,
   batches,
+  fsom,
   fpath_out,
   cols = NULL,
   cores = parallel::detectCores() - 1,
@@ -18,6 +19,10 @@
 \item{fnames}{vector. Full paths to FCS files that should be split}
 
 \item{batches}{vector. Batch labels per file in \code{fnames}}
+
+\item{fsom}{FlowSOM object. Trained FlowSOM model with channels matching
+those in all FCS files (same panel of markers) to use for distinguishing
+cell compartments (metaclusters) to normalize separately}
 
 \item{fpath_out}{string. Path to directory where the split FCS files should
 be saved}
@@ -31,10 +36,6 @@ least 2). Defaults to number of detectable cores minus 1}
 \item{verbose}{logical. Whether to indicate progress. Defaults to \code{TRUE}}
 
 \item{...}{optional additional named parameters for \code{\link[flowCore:read.FCS]{flowCore::read.FCS()}}}
-
-\item{fsom}{FlowSOM object. Trained FlowSOM model with channels matching
-those in all FCS files (same panel of markers) to use for distinguishing
-cell compartments (metaclusters) to normalize separately}
 }
 \value{
 data frame with columns \emph{'Metacluster'}, \emph{'FileName'}, \emph{'Sample'}

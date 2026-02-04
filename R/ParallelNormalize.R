@@ -12,13 +12,13 @@
 #'
 #' @param fnames vector. Full paths to FCS files that should be split
 #' @param batches vector. Batch labels per file in `fnames`
+#' @param fsom FlowSOM object. Trained FlowSOM model with channels matching 
+#' those in all FCS files (same panel of markers) to use for distinguishing 
+#' cell compartments (metaclusters) to normalize separately
 #' @param fpath_out string. Path to directory where the split FCS files should 
 #' be saved
 #' @param cols integer or string vector or `NULL`. Indices or names of channels 
 #' which should be normalized, or `NULL` to use all. Defaults to `NULL`
-#' @param fsom FlowSOM object. Trained FlowSOM model with channels matching 
-#' those in all FCS files (same panel of markers) to use for distinguishing 
-#' cell compartments (metaclusters) to normalize separately
 #' @param cores integer. Number of CPU cores to use for parallelization (at
 #' least 2). Defaults to number of detectable cores minus 1
 #' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
@@ -40,6 +40,7 @@
 .SplitSamplesByMetaclusters <- function(
   fnames,
   batches,
+  fsom,
   fpath_out,
   cols     = NULL,
   cores    = parallel::detectCores()-1,
@@ -71,7 +72,7 @@
   registerDoSNOW(clu)
   
   if (verbose) {
-    pb <- utils::txtProgressBar(min = 0, max = n_fcs, style = 3)
+    pb <- utils::txtProgressBar(min = 0, max = length(fnames), style = 3)
     opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
   } else {
     opts <- list()
@@ -360,6 +361,7 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
     .SplitSamplesByMetaclusters(
       fnames    = fnames,
       batches   = batches,
+      fsom      = fsom,
       fpath_out = tmp,
       cols      = cols,
       cores     = cores,
@@ -572,6 +574,7 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
   n_batch <- length(unique(batches))
   cols    <- attributes(model)$cols
   n_cols  <- attributes(model)$n_cols
+  fsom    <- model$fsom
   
   if (verbose) {
     message(paste0(
@@ -597,6 +600,7 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
     .SplitSamplesByMetaclusters(
       fnames    = fnames,
       batches   = batches,
+      fsom      = fsom,
       fpath_out = tmp,
       cols      = cols,
       cores     = cores,
