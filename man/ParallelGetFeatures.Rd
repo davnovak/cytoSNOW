@@ -18,7 +18,7 @@ ParallelGetFeatures(
 )
 }
 \arguments{
-\item{fsom}{FlowSOM object. Trained FlowSOM model with channels matching to
+\item{fsom}{FlowSOM object. Trained FlowSOM model with channels matching
 those in all FCS files (same panel of markers)}
 
 \item{fnames}{vector. Full paths to FCS files}
@@ -40,7 +40,7 @@ and/or phenopositivities. Defaults to NULL}
 or marker that are the upper bounds for strictly negative phenotype. Required
 for computing phenopositivities. Defaults to NULL}
 
-\item{cores}{integer. Number of CPU cores to use for multi-threading (at
+\item{cores}{integer. Number of CPU cores to use for parallelization (at
 least 2). Defaults to number of detectable cores minus 1}
 
 \item{sample_names}{string vector or NULL. Names of samples in \code{fnames} to
@@ -49,7 +49,7 @@ used. Defaults to NULL}
 
 \item{verbose}{logical. Whether to indicate progress. Defaults to TRUE}
 
-\item{...}{optional additional named parameters for \code{flowCore::read.FCS}}
+\item{...}{optional additional named parameters for \code{\link[flowCore:read.FCS]{flowCore::read.FCS()}}}
 }
 \value{
 list with named elements corresponding to matrices per requested
@@ -61,7 +61,7 @@ This is done by mapping the expression matrices of selected FCS samples onto
 an existing FlowSOM object.
 }
 \details{
-This function uses parallelisation via a SNOW cluster for speed-up.
+This function uses parallelization via a SNOW cluster for speed-up.
 
 Two groups of features can be extracted: \strong{abundance} features and \strong{state}
 features.
@@ -88,4 +88,8 @@ The phenopositivity thresholds then need to specified manually.
 The feature type names, in the order described here, correspond to
 \emph{'counts'}, \emph{'percentages'}, \emph{'MFIs'}, and \emph{'percentages_positive'} in the
 FlowSOM package.
+}
+\seealso{
+\code{\link[FlowSOM:GetFeatures]{FlowSOM::GetFeatures()}} for the original FlowSOM feature-extraction
+function
 }

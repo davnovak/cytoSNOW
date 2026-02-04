@@ -46,7 +46,7 @@ least 2). Defaults to number of detectable cores minus 1}
 
 \item{verbose}{logical. Whether to indicate progress. Defaults to \code{TRUE}}
 
-\item{...}{optional additional named parameters for \code{flowCore::read.FCS}}
+\item{...}{optional additional named parameters for \code{\link[flowCore:read.FCS]{flowCore::read.FCS()}}}
 }
 \value{
 nothing is returned
@@ -84,4 +84,9 @@ create initial specs for the transformation and then tuning the linearisation
 width (\code{w}) parameter for each channel's transformation until satisfactory.
 For mass cytometry data, we recommend using \code{flowCore::arcsinhTransform} with
 a scale factor (\code{b}) of about 5.
+}
+\seealso{
+\code{\link[flowCore:read.FCS]{flowCore::read.FCS()}} for FCS file import, \code{\link[flowCore:compensation-class]{flowCore::compensate()}}
+for cytometry data compensation, and \code{\link[flowCore:transform]{flowCore::transform()}} for cytometry
+data transformation
 }

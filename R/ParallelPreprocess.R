@@ -23,6 +23,10 @@
 #'
 #' @return `data.frame` with columns *'Reference'*, *'Real'*, and *'Index'*
 #' (mapping of `ref` onto `real`)
+#' 
+#' @seealso [flowCore::read.FCS()] for FCS file import and 
+#' [stringr::str_extract()] for extraction of substring matches using 
+#' regular expression patterns
 #'
 #' @export
 MatchChannels <- function(
@@ -115,7 +119,7 @@ MatchChannels <- function(
 #' @param cores integer. Number of CPU cores to use for multi-threading (at
 #' least 2). Defaults to number of detectable cores minus 1
 #' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
-#' @param ... optional additional named parameters for `flowCore::read.FCS`
+#' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
 #' @details
 #' 
@@ -147,6 +151,10 @@ MatchChannels <- function(
 #' a scale factor (`b`) of about 5.
 #'
 #' @return nothing is returned
+#'
+#' @seealso [flowCore::read.FCS()] for FCS file import, [flowCore::compensate()]
+#' for cytometry data compensation, and [flowCore::transform()] for cytometry
+#' data transformation
 #'
 #' @export
 ParallelPreprocess <- function(
@@ -181,7 +189,7 @@ ParallelPreprocess <- function(
               tolower(substr(fnames, nchar(fnames)-3, nchar(fnames))) == '.fcs')
   stopifnot('`fpath_out` must be a single string' =
               is.character(fpath_out) && length(fpath_out)==1)
-  if (!file.exists(fpath_out)) {
+  if (!dir.exists(fpath_out)) {
     res_fpath_out <- tryCatch(
       expr    = { dir.create(fpath_out) },
       error   = function(e) FALSE,
@@ -251,7 +259,7 @@ ParallelPreprocess <- function(
   
   ## Extract channels and markers from first file
   
-  panel <- GetPanels(fnames[1])[[1]]
+  panel <- GetPanels(fnames[1], ...)[[1]]
   
   ## Import multi-threading functions
   

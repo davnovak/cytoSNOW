@@ -10,13 +10,14 @@ I have written about an initial experiment with *cytoSNOW* in a blog post ([here
 <hr>
 
 Below are the tasks that *cytoSNOW* accelerates right now.
-The scope is being extended continuously: for instance, batch effect correction via *CytoNorm* will be included soon.
+The scope is being extended continuously: for instance, differential abundance/state testing via *diffcyt* will be included.
 
 | Task | Original implementation | Fast implementation |
 | :-- | :-- | :-- |
 | Pre-processing               | `flowCore` compensation and transformation | `cytoSNOW::ParallelPreprocess`  |
 | FCS file aggregation         | `FlowSOM::AggregateFlowFrames`             | `cytoSNOW::ParallelAggregate`   |
 | `FlowSOM` feature extraction | `FlowSOM::GetFeatures`                     | `cytoSNOW::ParallelGetFeatures` |
+| `CytoNorm` batch effect correction | `CytoNorm::CytoNorm.train` and `CytoNorm::CytoNorm.normalize` | `cytoSNOW::ParallelNormalize.Train` and `cytoSNOW::ParallelNormalize.Apply` **(caution: still undergoing tests)** |
 
 *cytoSNOW* will speed up your analysis as long as you can use more than 1 CPU core.
 We'll include guidelines for use in cloud computing and with HPCs eventually.

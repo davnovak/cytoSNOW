@@ -5,10 +5,10 @@
 #' aggregates data from specified FCS files.
 #' The size of this aggregate may be capped at an approximately fixed size.
 #'
-#' This function uses parallelisation via a SNOW cluster for speed-up.
+#' This function uses parallelization via a SNOW cluster for speed-up.
 #'
 #' @param fnames string vector. Full paths to FCS files
-#' @param N integer or `Inf` or `NULL`. Target aggregate size (>2), or `Inf` or
+#' @param N integer or `Inf` or `NULL`. Target aggregate size (>2), or `Inf`, or
 #' `NULL` to take all events. Defaults to `NULL`
 #' @param batches integer vector or `NULL`. Batch numbers per FCS file. Defaults
 #' to `NULL`
@@ -21,7 +21,7 @@
 #' (due to no subsampling). Defaults to `FALSE`
 #' @param seed integer or `NULL`. Seed for random number generation for
 #' subsampling, or `NULL` to not set a seed. Defaults to `NULL`
-#' @param cores integer. Number of CPU cores to use for multi-threading (at
+#' @param cores integer. Number of CPU cores to use for parallelization (at
 #' least 2). Defaults to number of detectable cores minus 1
 #' @param as_flowFrame logical. Whether to return a `flowCore::flowFrame` rather
 #' than an expression matrix with channel names for columns. Defaults to `TRUE`
@@ -34,13 +34,13 @@
 #' @param metacluster integer. Metacluster number to extract events, if FlowSOM
 #' model is specified. Defaults to 1
 #' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
-#' @param ... optional additional named parameters for `flowCore::read.FCS`
+#' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
 #' @details
 #' For a target aggregate size `N` and `n` FCS files, each `flowFrame`
 #' contributes about `N/n`, unless one or more files have fewer than `N/n`
 #' cells, in which case all their events are taken and the sample sizes for
-#' other files is increased to compensate for this.
+#' other files is increased to make up for this.
 #'
 #' If a corresponding FlowSOM model with metaclustering is given, we can choose
 #' to extract only events that get mapped onto a specific metacluster.
@@ -58,6 +58,9 @@
 #' These can be accessed as `attributes(output_object)$fnames`, etc.
 #'
 #' @return `flowCore::flowFrame` or matrix with named columns
+#'
+#' @seealso [FlowSOM::AggregateFlowFrames()] for the original FlowSOM 
+#' aggregation function
 #'
 #' @export
 ParallelAggregate <- function(

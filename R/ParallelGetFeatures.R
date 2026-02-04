@@ -5,9 +5,9 @@
 #' This is done by mapping the expression matrices of selected FCS samples onto
 #' an existing FlowSOM object.
 #'
-#' This function uses parallelisation via a SNOW cluster for speed-up.
+#' This function uses parallelization via a SNOW cluster for speed-up.
 #'
-#' @param fsom FlowSOM object. Trained FlowSOM model with channels matching to
+#' @param fsom FlowSOM object. Trained FlowSOM model with channels matching 
 #' those in all FCS files (same panel of markers)
 #' @param fnames  vector. Full paths to FCS files
 #' @param level  vector. Resolution level(s) of interest for feature
@@ -23,13 +23,13 @@
 #' @param thresholds named numeric vector or NULL. Expression values per channel
 #' or marker that are the upper bounds for strictly negative phenotype. Required
 #' for computing phenopositivities. Defaults to NULL
-#' @param cores integer. Number of CPU cores to use for multi-threading (at
+#' @param cores integer. Number of CPU cores to use for parallelization (at
 #' least 2). Defaults to number of detectable cores minus 1
 #' @param sample_names string vector or NULL. Names of samples in `fnames` to
 #' use as the rownames of features matrices. Otherwise, `fnames` themselves are
 #' used. Defaults to NULL
 #' @param verbose logical. Whether to indicate progress. Defaults to TRUE
-#' @param ... optional additional named parameters for `flowCore::read.FCS`
+#' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
 #' @details
 #' Two groups of features can be extracted: **abundance** features and **state**
@@ -60,6 +60,9 @@
 #'
 #' @return list with named elements corresponding to matrices per requested
 #' feature `type`, each with prefix *'clusters_'* or *'metaclusters_'*
+#'
+#' @seealso [FlowSOM::GetFeatures()] for the original FlowSOM feature-extraction 
+#' function
 #'
 #' @export
 ParallelGetFeatures <- function(

@@ -24,7 +24,7 @@ ParallelAggregate(
 \arguments{
 \item{fnames}{string vector. Full paths to FCS files}
 
-\item{N}{integer or \code{Inf} or \code{NULL}. Target aggregate size (>2), or \code{Inf} or
+\item{N}{integer or \code{Inf} or \code{NULL}. Target aggregate size (>2), or \code{Inf}, or
 \code{NULL} to take all events. Defaults to \code{NULL}}
 
 \item{batches}{integer vector or \code{NULL}. Batch numbers per FCS file. Defaults
@@ -43,7 +43,7 @@ each sample in the aggregate. If \code{N} is \code{Inf} or \code{NULL}, implicit
 \item{seed}{integer or \code{NULL}. Seed for random number generation for
 subsampling, or \code{NULL} to not set a seed. Defaults to \code{NULL}}
 
-\item{cores}{integer. Number of CPU cores to use for multi-threading (at
+\item{cores}{integer. Number of CPU cores to use for parallelization (at
 least 2). Defaults to number of detectable cores minus 1}
 
 \item{as_flowFrame}{logical. Whether to return a \code{flowCore::flowFrame} rather
@@ -62,7 +62,7 @@ model is specified. Defaults to 1}
 
 \item{verbose}{logical. Whether to indicate progress. Defaults to \code{TRUE}}
 
-\item{...}{optional additional named parameters for \code{flowCore::read.FCS}}
+\item{...}{optional additional named parameters for \code{\link[flowCore:read.FCS]{flowCore::read.FCS()}}}
 }
 \value{
 \code{flowCore::flowFrame} or matrix with named columns
@@ -73,12 +73,12 @@ aggregates data from specified FCS files.
 The size of this aggregate may be capped at an approximately fixed size.
 }
 \details{
-This function uses parallelisation via a SNOW cluster for speed-up.
+This function uses parallelization via a SNOW cluster for speed-up.
 
 For a target aggregate size \code{N} and \code{n} FCS files, each \code{flowFrame}
 contributes about \code{N/n}, unless one or more files have fewer than \code{N/n}
 cells, in which case all their events are taken and the sample sizes for
-other files is increased to compensate for this.
+other files is increased to make up for this.
 
 If a corresponding FlowSOM model with metaclustering is given, we can choose
 to extract only events that get mapped onto a specific metacluster.
@@ -94,4 +94,8 @@ number of origin per event.
 The output gets attributes \code{fnames}, \code{seed}, and \code{metacluster} (which gets
 \code{NULL} if no FlowSOM model was given) with the corresponding argument values.
 These can be accessed as \code{attributes(output_object)$fnames}, etc.
+}
+\seealso{
+\code{\link[FlowSOM:AggregateFlowFrames]{FlowSOM::AggregateFlowFrames()}} for the original FlowSOM
+aggregation function
 }

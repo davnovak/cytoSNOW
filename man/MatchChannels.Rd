@@ -33,3 +33,8 @@ If this is insufficient, an exact match is sought.
 If all three of these approaches fail to yield a 1-to-1 matching, an error
 message is generated.
 }
+\seealso{
+\code{\link[flowCore:read.FCS]{flowCore::read.FCS()}} for FCS file import and
+\code{\link[stringr:str_extract]{stringr::str_extract()}} for extraction of substring matches using
+regular expression patterns
+}

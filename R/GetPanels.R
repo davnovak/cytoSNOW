@@ -9,7 +9,7 @@
 #'
 #' @param fnames string vector. Full paths to FCS files
 #' @param ... optional additional named parameters for 
-#' `flowCore::read.FCSheader`
+#' [flowCore::read.FCSheader()]
 #'
 #' @return named `list` per file of `data.frame`s with columns *'Index'*,
 #' *'Channel'*, and *'Marker'*

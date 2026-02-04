@@ -10,7 +10,7 @@ GetPanels(fnames, ...)
 \item{fnames}{string vector. Full paths to FCS files}
 
 \item{...}{optional additional named parameters for
-\code{flowCore::read.FCSheader}}
+\code{\link[flowCore:read.FCSheader]{flowCore::read.FCSheader()}}}
 }
 \value{
 named \code{list} per file of \code{data.frame}s with columns \emph{'Index'},
