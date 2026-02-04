@@ -5,7 +5,7 @@ Using the [`snow`](https://cran.r-project.org/web/packages/snow/index.html) fram
 This makes it possible to run things **fast**.
 This is especially useful if you're running workflows **locally**, but *cytoSNOW* can power analyses **on high-performance computing (HPC) clusters** as well.
 
-I have written about an initial experiment with *cytoSNOW* in a blog post ([here](https://davnovak.github.io/docs/cytoSNOW/vignette.html)).
+I wrote about an initial experiment with *cytoSNOW* in a blog post ([here](https://davnovak.github.io/docs/cytoSNOW/vignette.html)).
 
 <hr>
 
@@ -133,3 +133,21 @@ fe <- cytoSNOW::ParallelGetFeatures(
 ```
 <hr>
 </details>
+
+## Notes
+
+Some general notes on parallelizing computational cytometry workflows.
+
+### Overhead
+
+Multi-core processing has some overhead.
+This means that your computer takes a little bit of time to set up your tasks to run in parallel.
+The more FCS samples you're processing, the more using *cytoSNOW* pays off.
+However, there will be rare cases where *cytoSNOW* doesn't provide a boost in speed, if you're processing very few samples.
+
+### Low-hanging fruit
+
+Many parts of a typical computational cytometry workflow can be optimized.
+But some, the 'low-hanging fruit', are worth the effort of optimizing more than others.
+For instance, *FlowSOM* clustering often takes up very little time compared to preprocessing, data aggregation, feature extraction, or batch effect correction&horbar;at least in workflows with many FCS files.
+That's why we focus preferentially on those.

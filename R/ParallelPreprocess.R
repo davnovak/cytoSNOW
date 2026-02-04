@@ -98,8 +98,6 @@ MatchChannels <- function(
 #' Applies pre-processing (compensation, and/or transformation) to FCS files.
 #' The pre-processed files are saved into a specified output directory.
 #'
-#' This function uses parallelisation via a SNOW cluster for speed-up.
-#'
 #' @param fnames string vector. Full paths to FCS files
 #' @param fpath_out string. Path to directory where results should be saved. If
 #' it does not exist, it will be created via `dir.create`
@@ -122,6 +120,7 @@ MatchChannels <- function(
 #' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
 #' @details
+#' This function uses parallelisation via a SNOW cluster for speed-up.
 #' 
 #' All FCS file names (even without the entire path) must be unique, so that
 #' they can be saved in `fpath_out` under their original names.

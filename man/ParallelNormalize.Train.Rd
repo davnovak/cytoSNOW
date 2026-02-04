@@ -54,7 +54,7 @@ least 2). Defaults to number of detectable cores minus 1}
 \value{
 list with named elements for the normalization FlowSOM model
 (\emph{'fsom'}) and the CytoNorm normalization model itself (\emph{'clusterRes'}).
-These names were chosen for compatibility with CytoNorm functions
+These names were chosen for compatibility with CytoNorm
 }
 \description{
 Trains a batch effect correction model using CytoNorm. This model can later
@@ -65,7 +65,11 @@ This function uses parallelization via a SNOW cluster for speed-up.
 
 If no precomputed FlowSOM model is given (\code{fsom} is not specified), the
 default training parameters are \code{nCells = 1e6}, \code{xdim = 15}, \code{ydim = 15},
-\code{nClus = 30}, and \code{scale = FALSE}.
+\code{nClus = 30}, and \code{scale = FALSE}. If \code{colsToUse} (channels to use for
+clustering) are not specified here, the value of \code{cols} (all channels that
+should be normalized) is used. If \code{cols} is also not specified, all channels
+in the panel are used. It is strongly recommended to specify both the \code{cols}
+parameter, and the \code{colsToUse} slot of \code{fsom_params}.
 }
 \note{
 The original \code{\link[CytoNorm:CytoNorm.train]{CytoNorm::CytoNorm.train()}} function includes a \code{transformList}
@@ -74,8 +78,9 @@ normalization model training/application. In contrast, this function does not
 include that parameter. This is to encourage doing preprocessing separately
 first, checking whether it's working correctly, and only then proceeding with
 normalization.
-This function generates temporary files in the \code{\link[=tempdir]{tempdir()}} directory, which
-it then automatically removes when done.
+
+Note that this function generates temporary files in the \code{\link[=tempdir]{tempdir()}}
+directory, which it then automatically removes when done.
 }
 \seealso{
 \code{\link[CytoNorm:CytoNorm.train]{CytoNorm::CytoNorm.train()}} for the original CytoNorm training

@@ -5,8 +5,6 @@
 #' aggregates data from specified FCS files.
 #' The size of this aggregate may be capped at an approximately fixed size.
 #'
-#' This function uses parallelization via a SNOW cluster for speed-up.
-#'
 #' @param fnames string vector. Full paths to FCS files
 #' @param N integer or `Inf` or `NULL`. Target aggregate size (>2), or `Inf`, or
 #' `NULL` to take all events. Defaults to `NULL`
@@ -37,6 +35,8 @@
 #' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
 #' @details
+#' This function uses parallelization via a SNOW cluster for speed-up.
+#' 
 #' For a target aggregate size `N` and `n` FCS files, each `flowFrame`
 #' contributes about `N/n`, unless one or more files have fewer than `N/n`
 #' cells, in which case all their events are taken and the sample sizes for

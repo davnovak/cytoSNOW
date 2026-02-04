@@ -5,8 +5,6 @@
 #' This is done by mapping the expression matrices of selected FCS samples onto
 #' an existing FlowSOM object.
 #'
-#' This function uses parallelization via a SNOW cluster for speed-up.
-#'
 #' @param fsom FlowSOM object. Trained FlowSOM model with channels matching 
 #' those in all FCS files (same panel of markers)
 #' @param fnames  vector. Full paths to FCS files
@@ -32,6 +30,8 @@
 #' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
 #' @details
+#' This function uses parallelization via a SNOW cluster for speed-up.
+#' 
 #' Two groups of features can be extracted: **abundance** features and **state**
 #' features.
 #' **Abundance** features can be used to describe compositional changes between

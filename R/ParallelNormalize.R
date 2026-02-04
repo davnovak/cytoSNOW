@@ -158,8 +158,6 @@
 #' Trains a batch effect correction model using CytoNorm. This model can later 
 #' be applied using [cytoSNOW::ParallelNormalize.Apply()].
 #'
-#' This function uses parallelization via a SNOW cluster for speed-up.
-#'
 #' @param fnames vector. Full paths to training FCS files
 #' @param batches vector. Batch labels per file in `fnames`
 #' @param cols integer or string vector or `NULL`. Indices or names of channels 
@@ -183,9 +181,15 @@
 #' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
 #' @details
+#' This function uses parallelization via a SNOW cluster for speed-up.
+#' 
 #' If no precomputed FlowSOM model is given (`fsom` is not specified), the 
 #' default training parameters are `nCells = 1e6`, `xdim = 15`, `ydim = 15`,
-#' `nClus = 30`, and `scale = FALSE`.
+#' `nClus = 30`, and `scale = FALSE`. If `colsToUse` (channels to use for 
+#' clustering) are not specified here, the value of `cols` (all channels that 
+#' should be normalized) is used. If `cols` is also not specified, all channels 
+#' in the panel are used. It is strongly recommended to specify both the `cols` 
+#' parameter, and the `colsToUse` slot of `fsom_params`.
 #' 
 #' @note
 #' The original [CytoNorm::CytoNorm.train()] function includes a `transformList` 
@@ -194,12 +198,13 @@
 #' include that parameter. This is to encourage doing preprocessing separately 
 #' first, checking whether it's working correctly, and only then proceeding with
 #' normalization.
-#' This function generates temporary files in the [tempdir()] directory, which 
-#' it then automatically removes when done.
+#'
+#' Note that this function generates temporary files in the [tempdir()] 
+#' directory, which it then automatically removes when done.
 #'
 #' @return list with named elements for the normalization FlowSOM model 
 #' (*'fsom'*) and the CytoNorm normalization model itself (*'clusterRes'*). 
-#' These names were chosen for compatibility with CytoNorm functions
+#' These names were chosen for compatibility with CytoNorm
 #'
 #' @seealso [CytoNorm::CytoNorm.train()] for the original CytoNorm training
 #' function
@@ -315,6 +320,9 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
     
     fsom.nCells    <- fsom_params[['nCells']]
     fsom.colsToUse <- fsom_params[['colsToUse']]
+    if (is.null(fsom.colsToUse) && !is.null(cols)) {
+      fsom.colsToUse <- cols
+    }
     pars           <- fsom_params[
       grep('nCells|channels|colsToUse', names(fsom_params), invert = TRUE)
     ]
@@ -471,8 +479,6 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
 #' Applies a CytoNorm batch effect correction model, trained via 
 #' [cytoSNOW::ParallelNormalize.Train()], to FCS files affected by batch effect.
 #'
-#' This function uses parallelization via a SNOW cluster for speed-up.
-#'
 #' @param model normalization model generated with 
 #' [cytoSNOW::ParallelNormalize.train()]
 #' @param fnames vector. Full paths to FCS files which should be normalized
@@ -488,6 +494,9 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
 #' least 2). Defaults to number of detectable cores minus 1
 #' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
 #' @param ... optional additional named parameters for [flowCore::read.FCS()]
+#'
+#' @details
+#' This function uses parallelization via a SNOW cluster for speed-up.
 #'
 #' @note
 #' It is highly advisable to have unique file names for each input FCS sample 
