@@ -371,7 +371,7 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
       batches   = batches,
       fsom      = fsom,
       fpath_out = tmp,
-      cols      = cols,
+      cols      = intersect(colnames(fsom$map$codes), cols),
       cores     = cores,
       verbose   = verbose,
       ...
@@ -611,7 +611,7 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
       batches   = batches,
       fsom      = fsom,
       fpath_out = tmp,
-      cols      = cols,
+      cols      = intersect(colnames(fsom$map$codes), cols),
       cores     = cores,
       verbose   = verbose,
       ...
