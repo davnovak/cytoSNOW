@@ -107,7 +107,6 @@
     
     fnames_split <- c()
     
-    idx <- 0
     for (mcl in umcl) {
       
       mask <- mcls==mcl
@@ -128,16 +127,22 @@
             file = fname_split
           )
         )
+      } else {
+        
+        fnames_split <- c(fnames_split, NA)
       }
     }
     
+    meta_df <- data.frame(
+      'Metacluster' = umcl,
+      'FileName'    = fnames_split,
+      'Sample'      = fname,
+      'Batch'       = batch
+    )
+    meta_df <- meta_df[!is.na(meta_df$FileName), ]
+    
     return(
-      data.frame(
-        'Metacluster' = umcl,
-        'FileName'    = fnames_split,
-        'Sample'      = fname,
-        'Batch'       = batch
-      )
+      meta_df
     )
   }
   
@@ -289,6 +294,7 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
   n_fcs   <- length(fnames)
   n_batch <- length(unique(batches))
   panel   <- GetPanels(fnames[1], ...)[[1]]
+  
   n_cols  <-
     if (!is.null(cols)) {
       length(cols)
@@ -434,7 +440,8 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
         'verbose'       = verbose,
         'plot'          = FALSE
       ),
-      norm_params
+      norm_params,
+      list(...)
     )
     if (is.list(pars[['goal']])) {
       pars[['goal']] <- pars[['goal']][[mcl]]
@@ -628,7 +635,7 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
   ## Apply metacluster-channel normalizations
   
   if (verbose) {
-    message('Modeling metacluster-channel distributions by batch')
+    message('Applying metacluster-channel normalizations by batch')
   }
   
   if (is.null(cols)) {
@@ -681,7 +688,8 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
       transformList         = NULL,
       transformList.reverse = NULL,
       removeOriginal        = FALSE,
-      verbose               = FALSE
+      verbose               = FALSE,
+      ...
     )
     
     return(
@@ -715,7 +723,9 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
   
   packages <- c('flowCore', 'FlowSOM')
   
-  codes <- fsom$map$codes[, cols, drop = FALSE]
+  codes <- fsom$map$codes[
+    , intersect(cols, colnames(fsom$map$codes)), drop = FALSE
+  ]
   meta  <- fsom$metaclustering
   
   clu <- makeCluster(cores)
@@ -775,6 +785,14 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
     })
     return(invisible(NULL))
   }
+  
+  if (verbose) {
+    close(pb)
+  }
+  stopCluster(clu)
+  invisible(gc())
+  rm(clu)
+  invisible(gc())
   
   invisible(suppressWarnings({
     file.remove(meta_norm$FileName)  
