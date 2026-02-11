@@ -14,7 +14,7 @@ The scope is being extended continuously: for instance, differential abundance/s
 
 | Task | Original implementation | Fast implementation |
 | :-- | :-- | :-- |
-| Pre-processing               | `flowCore` compensation and transformation | `cytoSNOW::ParallelPreprocess`  |
+| Preprocessing               | `flowCore` compensation and transformation | `cytoSNOW::ParallelPreprocess`  |
 | FCS file aggregation         | `FlowSOM::AggregateFlowFrames`             | `cytoSNOW::ParallelAggregate`   |
 | `FlowSOM` feature extraction | `FlowSOM::GetFeatures`                     | `cytoSNOW::ParallelGetFeatures` |
 | `CytoNorm` batch effect correction | `CytoNorm::CytoNorm.train` and `CytoNorm::CytoNorm.normalize` | `cytoSNOW::ParallelNormalize.Train` and `cytoSNOW::ParallelNormalize.Apply` **(caution: still undergoing tests)** |
@@ -33,106 +33,7 @@ devtools::install_github('davnovak/cytoSNOW')
 ## Usage
 
 The vignette (`vignette.Rmd`) contains an easy walk-through that quantifies the speed-up brought about by using *cytoSNOW*.
-
-Alternatively, the code snippets below can be used to generate a synthetic large dataset and deploy a generic analytical workflow using *cytoSNOW*.
-The workflow is based on a standard *FlowSOM* protocol, as published [here](https://www.nature.com/articles/s41596-021-00550-0).
-
-Each *cytoSNOW* function used below is carefully documented.
-You can view the documentation using ```?cytoSNOW::NameOfFunction```.
-
-<details>
-<summary><b>Input data generation</b></summary>
-<br>
-
-We begin by generating a synthetic dataset of `N` samples (2000 by default).
-(In reality, we only create a single FCS file but reuse it, pretending there are 2000 of them.)
-
-```r
-## Simulate synthetic data ----
-
-N  <- 2000          # sample count
-nr <- 3e5           # cells per sample
-nc <- 30            # number of markers
-idcs_type <- 1:20   # markers for cell type
-idcs_state <- 21:30 # markers for cell state
-
-markers <- paste0('Marker', seq_len(nc))
-set.seed(1); ff <- cytoSNOW::ValidateFCS(
-  `colnames<-`( # Gaussian noise
-    matrix(rnorm(nr*nc, mean = 10, sd = 5), ncol = nc),
-    markers
-  )
-)
-
-fname_input <- 'InputSample.fcs'
-flowCore::write.FCS(ff, fname_input)
-fnames <- rep(fname_input, times = N)
-
-Sys.setenv( # exception for cytoSNOW to use same file multiple times
-  'DUPLICATE_EXCEPTION' = TRUE 
-)
-```
-
-To be able to simulate pre-processing, we also generate a spillover matrix for compensation and a `flowCore::transformList` for signal transformation.
-
-```r
-## Create a spillover matrix for compensation ----
-
-set.seed(1); spillover <- # Gaussian noise with 1 on the diagonal
-  `diag<-`(matrix(abs(rnorm(nc**2, mean = 1e-2, sd = 1e-3)), ncol = nc), 1.)
-rownames(spillover) <- colnames(spillover) <- markers
-
-## Create transformation instructions per channel ----
-
-tf_list <- flowCore::transformList(
-  from = markers, tfun = flowCore::arcsinhTransform(b = 120)
-)
-```
-<hr>
-</details>
-<details>
-<summary><b>Aggregation</b></summary>
-<br>
-
-The next step in the standard protocol is to aggregate expression data from all the pre-processed files, to obtain training data for the clustering model.
-
-```r
-agg <- cytoSNOW::ParallelAggregate(fnames = fnames_pre, N = 1e6)
-```
-
-This creates a 1-million-cell expression matrix that samples cells from all the files, making sure each sample is represented.
-<hr>
-</details>
-<details>
-<summary><b>Clustering</b></summary>
-<br>
-
-*FlowSOM* clustering itself is actually very fast.
-Despite numerous approaches optimising this process to run faster, this is rarely the real bottleneck.
-
-```r
-fsom <- FlowSOM::FlowSOM(agg1, nClus = 40, colsToUse = markers[idcs_type])
-```
-<hr>
-</details>
-<details>
-<summary><b>Feature extraction</b></summary>
-<br>
-
-To be able to compare cell types and cell state across cytometry samples, we would typically use feature extraction as implemented in *FlowSOM*.
-Here, we accelerate the feature extraction process.
-
-```r
-fe <- cytoSNOW::ParallelGetFeatures(
-  fsom          = fsom,
-  fnames        = fnames_pre,
-  level         = c('clusters', 'metaclusters'),
-  type          = c('counts', 'proportions', 'medians'),
-  state_markers = markers[idcs_state]
-)
-```
-<hr>
-</details>
+It mirrors the standard *FlowSOM* protocol, as published [here](https://www.nature.com/articles/s41596-021-00550-0).
 
 ## Notes
 
