@@ -17,7 +17,7 @@ The scope is being extended continuously: for instance, differential abundance/s
 | Preprocessing               | `flowCore` compensation and transformation | `cytoSNOW::ParallelPreprocess`  |
 | FCS file aggregation         | `FlowSOM::AggregateFlowFrames`             | `cytoSNOW::ParallelAggregate`   |
 | `FlowSOM` feature extraction | `FlowSOM::GetFeatures`                     | `cytoSNOW::ParallelGetFeatures` |
-| `CytoNorm` batch effect correction | `CytoNorm::CytoNorm.train` and `CytoNorm::CytoNorm.normalize` | `cytoSNOW::ParallelNormalize.Train` and `cytoSNOW::ParallelNormalize.Apply` **(caution: still undergoing tests)** |
+| `CytoNorm` batch effect correction | `CytoNorm::CytoNorm.train` and `CytoNorm::CytoNorm.normalize` | `cytoSNOW::ParallelNormalize.Train` and `cytoSNOW::ParallelNormalize.Apply` |
 
 *cytoSNOW* will speed up your analysis as long as you can use more than 1 CPU core.
 We'll include guidelines for use in cloud computing and with HPCs eventually.
