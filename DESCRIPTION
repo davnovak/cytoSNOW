@@ -1,10 +1,10 @@
 Package: cytoSNOW
 Type: Package
-Title: Fast parallelised functions for cytometry data analysis
-Version: 0.1.0
+Title: Fast cytometry data analysis
+Version: 0.1.1
 Author: David Novak
 Maintainer: David Novak <davidnovak9000@gmail.com>
-Description: Uses Simple Network Of Workstations (SNOW) cluster computing to accelerate computational cytometry workflows.
+Description: Accelerates cytometry data analysis using a Simple Network Of Workstations (SNOW) cluster.
 License: Apache License 2.0
 Encoding: UTF-8
 LazyData: true

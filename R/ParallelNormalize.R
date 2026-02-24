@@ -19,6 +19,8 @@
 #' be saved
 #' @param cols integer or string vector or `NULL`. Indices or names of channels 
 #' which should be normalized, or `NULL` to use all. Defaults to `NULL`
+#' @param remove_na logical. Whether empty sample-metacluster combinations 
+#' should be left out of the returned data frame. Defaults to `TRUE`
 #' @param cores integer. Number of CPU cores to use for parallelization (at
 #' least 2). Defaults to number of detectable cores minus 1
 #' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
@@ -42,9 +44,10 @@
   batches,
   fsom,
   fpath_out,
-  cols     = NULL,
-  cores    = parallel::detectCores()-1,
-  verbose  = TRUE,
+  cols      = NULL,
+  remove_na = TRUE,
+  cores     = parallel::detectCores()-1,
+  verbose   = TRUE,
   ...
 ) {
   
@@ -139,7 +142,10 @@
       'Sample'      = fname,
       'Batch'       = batch
     )
-    meta_df <- meta_df[!is.na(meta_df$FileName), ]
+    
+    if (remove_na) {
+      meta_df <- meta_df[!is.na(meta_df$FileName), ]
+    }
     
     return(
       meta_df
@@ -157,11 +163,180 @@
   res
 }
 
-
-#' Parallel normalization model training
+#' Split cytometry samples by gates
 #'
-#' Trains a batch effect correction model using CytoNorm. This model can later 
-#' be applied using [cytoSNOW::ParallelNormalize.Apply()].
+#' Splits FCS files into gates defined by a gating function. 
+#'
+#' This function uses parallelization via a SNOW cluster for speed-up.
+#' 
+#' This is an internal cytoSNOW function that does not need to be called by the 
+#' user. Input validation is not carried out, unlike in the (safer) user-level 
+#' functions [cytoSNOW::ParallelNormalize.Train()] and 
+#' [cytoSNOW::ParallelNormalize.apply()].
+#'
+#' @param fnames vector. Full paths to FCS files that should be split
+#' @param batches vector. Batch labels per file in `fnames`
+#' @param gating_fun function. Takes a [flowCore::flowFrame] object as input and
+#' returns a gate label per event
+#' @param gate_names vector. Names of all gates from `gating_fun`
+#' @param fpath_out string. Path to directory where the split FCS files should 
+#' be saved
+#' @param cols integer or string vector or `NULL`. Indices or names of channels 
+#' which should be normalized, or `NULL` to use all. Defaults to `NULL`
+#' @param remove_na logical. Whether empty sample-gate combinations should be 
+#' left out of the returned data frame. Defaults to `TRUE`
+#' @param cores integer. Number of CPU cores to use for parallelization (at
+#' least 2). Defaults to number of detectable cores minus 1
+#' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
+#' @param ... optional additional named parameters for [flowCore::read.FCS()]
+#'
+#' @details
+#' The original FCS file names are used, along with the postfix 
+#' *'_GateXX'* where *XX* stands for an internally generated gate number.
+#'
+#' @return data frame with columns *'Gate'*, *'FileName'*, *'Sample'* 
+#' (*i.e.*, the original file name), and *'Batch'* that identifies the split FCS 
+#' files written to disk
+#'
+#' @seealso [cytoSNOW::ParallelNormalize.Train()] for parallel training of 
+#' CytoNorm normalization models and [cytoSNOW::ParallelNormalize.apply()] for 
+#' the parallel application of CytoNorm normalization models
+#' 
+#' @export
+.SplitSamplesByGates <- function(
+  fnames,
+  batches,
+  gating_fun,
+  gate_names,
+  fpath_out,
+  cols      = NULL,
+  remove_na = TRUE,
+  cores     = parallel::detectCores()-1,
+  verbose   = TRUE,
+  ...
+) {
+  
+  ## Import multi-threading functions
+
+  makeCluster    <- snow::makeCluster
+  registerDoSNOW <- doSNOW::registerDoSNOW
+  foreach        <- foreach::foreach
+  `%dopar%`      <- foreach::`%dopar%`
+  stopCluster    <- snow::stopCluster
+
+  ## Create gate codes
+  
+  gate_codes <- `names<-`(sprintf('%03d', seq_along(gate_names)), gate_names)
+  
+  ## Split samples by gates in parallel
+  
+  clu <- makeCluster(cores)
+  registerDoSNOW(clu)
+  
+  packages <- c()
+  
+  if (verbose) {
+    pb <- utils::txtProgressBar(min = 0, max = length(fnames), style = 3)
+    opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
+  } else {
+    opts <- list()
+  }
+
+  res <- foreach( # iterate over FCS files asynchronously
+    i             = seq_along(fnames),
+    .combine      = rbind,
+    .inorder      = FALSE,
+    .final        = NULL,
+    .packages     = packages,
+    .options.snow = opts
+  ) %dopar% {
+
+    fname <- fnames[i]
+    batch <- batches[i]
+
+    ff <- flowCore::read.FCS(fname, ...)
+    gates <- gating_fun(ff)
+    
+    invalid_gates <- unique(gates[!gates%in%names(gate_codes)])
+    
+    if (length(invalid_gates)>0) {
+      stop(
+        'The following gates from `gating_fun` ',
+        'were not found in `gate_names`: ',
+        paste0(invalid_gates)
+      )
+    }
+
+    fnames_split <- c()
+
+    for (i in seq_along(gate_codes)) {
+
+      gate <- names(gate_codes)[i]
+      code <- gate_codes[i]
+      mask <- gates==gate
+      
+      if (sum(mask)>0) {
+
+        fname_split <- tempfile(
+          pattern = paste0(
+            gsub('[.]fcs$', '', gsub('[:/]', '_', fname)),
+            '_Gate', code, '_'
+          ),
+          tmpdir = fpath_out,
+          fileext = '.fcs'
+        )
+        fnames_split <- c(fnames_split, fname_split)
+        
+        ff_out <- ff[mask, ]
+        if (!is.null(cols) && length(cols)>0) {
+          ff_out <- ff_out[, cols]
+        }
+        
+        suppressWarnings(
+          flowCore::write.FCS(
+            ff_out,
+            file = fname_split
+          )
+        )
+      } else {
+
+        fnames_split <- c(fnames_split, NA)
+      }
+    }
+
+    meta_df <- data.frame(
+      'Gate'        = names(gate_codes),
+      'FileName'    = fnames_split,
+      'Sample'      = fname,
+      'Batch'       = batch
+    )
+    if (remove_na) {
+      meta_df <- meta_df[!is.na(meta_df$FileName), ]
+    }
+
+    return(
+      meta_df
+    )
+  }
+
+  if (verbose) {
+    close(pb)
+  }
+  stopCluster(clu)
+  invisible(gc())
+  rm(clu)
+  invisible(gc())
+
+  res
+}
+
+#' Parallel training of normalization model
+#'
+#' Trains a batch-effect correction model using CytoNorm. This model can later 
+#' be applied using [cytoSNOW::ParallelNormalize.Apply()]. Instead of using 
+#' FlowSOM clustering for splitting files into compartments, a custom gating 
+#' function can be used (see the `gating_fun` and `gate_names` parameters and 
+#' the *Details* section).
 #'
 #' @param fnames vector. Full paths to training FCS files
 #' @param batches vector. Batch labels per file in `fnames`
@@ -170,11 +345,19 @@
 #' @param fsom FlowSOM object. Trained FlowSOM model with channels matching 
 #' those in all FCS files (same panel of markers) to use for distinguishing 
 #' cell compartments (metaclusters) to normalize separately. Or `NULL` to train 
-#' a new one, using `fsom_params` as the training parameters. Defaults to `NULL`
+#' a new one using `fsom_params` as the training parameters, or to use a gating 
+#' model instead of FlowSOM. Defaults to `NULL`
 #' @param fsom_params named list. Parameters to pass to 
 #' [CytoNorm::prepareFlowSOM()] for the FlowSOM model training. Ignored if 
-#' `fsom` is specified. Must have at least *'nCells'* specified. See *Details* 
+#' `fsom` is specified or using a gating model instead. If specified, 
+#' `fsom_params` must give at least the *'nCells'* specified. See *Details* 
 #' for defaults
+#' @param gating_fun function. Takes a [flowCore::flowFrame] object as input and
+#' returns a gate label per event. Or `NULL` to use FlowSOM for splitting files
+#' instead. Defaults to `NULL`
+#' @param gate_names vector. Names of all gates from `gating_fun`. Or `NULL` to 
+#' use FlowSOM for splitting files. Must be specified if `gating_fun` is 
+#' specified. Defaults to `NULL`
 #' @param normMethod.train training function of the signal normalization method 
 #' to use. Defaults to `CytoNorm::QuantileNorm.train`
 #' @param norm_params named list. Parameters to pass to the normalization method 
@@ -196,6 +379,17 @@
 #' in the panel are used. It is strongly recommended to specify both the `cols` 
 #' parameter, and the `colsToUse` slot of `fsom_params`.
 #' 
+#' A gating model can be used to split FCS files instead of a FlowSOM model. To 
+#' do this, two input parameters need to be specified. First, a gating function 
+#' that takes a [flowCore::flowFrame] as input and returns a vector of gate 
+#' labels as output (`gating_fun`). Second, a vector with the names of all gates
+#' that `gating_fun` can output (`gate_names`). If both are specified, the 
+#' FlowSOM model and/or parameters are ignored. Instead of splitting training 
+#' FCS files by metacluster to train a separate normalization function for each 
+#' of them, they are split by gate, as defined by the user's function. This 
+#' gives more control and ensures that the model doesn't skew genuine 
+#' differential abundances of known cell types across batches.
+#' 
 #' @note
 #' The original [CytoNorm::CytoNorm.train()] function includes a `transformList` 
 #' parameter that lets the user apply transformation in conjunction with the 
@@ -207,12 +401,19 @@
 #' Note that this function generates temporary files in the [tempdir()] 
 #' directory, which it then automatically removes when done.
 #'
-#' @return list with named elements for the normalization FlowSOM model 
-#' (*'fsom'*) and the CytoNorm normalization model itself (*'clusterRes'*). 
-#' These names were chosen for compatibility with CytoNorm
+#' If a FlowSOM model (not gating) is used for the splitting of files, the 
+#' trained normalization model is compatible with the original 
+#' [CytoNorm::CytoNorm.normalize()] function for applying the normalization. 
+#' However, we recommend the use of [cytoSNOW::ParallelNormalize.Apply()].
+#'
+#' @return list with named elements for the CytoNorm normalization model 
+#' (*'clusterRes'*) and the splitting model: either FlowSOM (*'fsom'*) or the 
+#' custom gating model (*'gating'*).
 #'
 #' @seealso [CytoNorm::CytoNorm.train()] for the original CytoNorm training
 #' function
+#' @seealso [cytoSNOW::ParallelNormalize.Apply()] for applying the trained 
+#' normalization model
 #' 
 #' @export
 ParallelNormalize.Train <- ParallelNormalise.Train <- function(
@@ -227,6 +428,8 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
     'nClus'  = 30,
     'scale'  = FALSE
   ),
+  gating_fun       = NULL,
+  gate_names       = NULL,
   normMethod.train = CytoNorm::QuantileNorm.train,
   norm_params      = list(
     'nQ' = 99
@@ -272,6 +475,32 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
         !is.null(names(fsom_params)) &&
           length(unique(names(fsom_params)))==length(fsom_params))
     ))
+  
+  if (!is.null(gating_fun)) {
+    stopifnot(
+      'If `gating_fun` is specified, `gate_names` must be specified as well' =
+        !is.null(gate_names)
+    )
+    stopifnot(
+      'If specified, `gating_fun` must be a function' = is.function(gating_fun)
+    )
+  }
+  if (!is.null(gate_names)) {
+    stopifnot(
+      'If `gate_names` is specified, `gating_fun` must be specified as well' =
+        !is.null(gating_fun)
+    )
+    stopifnot(
+      'If specified, `gate_names` must be a non-empty non-list vector of strings numbers or factors' =
+      is.vector(gate_names) &&
+        (is.character(gate_names) ||
+           is.factor(gate_names) ||
+           is.numeric(gate_names)) &&
+        length(gate_names)>0 &&
+        !is.list(gate_names)
+    )
+  }
+  
   if (length(fsom_params)>0) {
     stopifnot('If specified, `fsom_params` must give `nCells` as a parameter' =
                 'nCells'%in%names(fsom_params))
@@ -285,15 +514,26 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
           length(unique(names(norm_params)))==length(norm_params))
       ))
   
+  if ('nQ' %in% names(norm_params)) {
+    stopifnot(
+      'Quantile count in goal distribution and CytoNorm call is different' =
+        nrow(norm_params[['goal']][[1]])==norm_params[['nQ']]
+    )
+  }
+  
   ## Determine a location for temporary files
   
   tmp <- tempdir(check = TRUE)
   
   ## Init
   
-  n_fcs   <- length(fnames)
-  n_batch <- length(unique(batches))
-  panel   <- GetPanels(fnames[1], ...)[[1]]
+  n_fcs      <- length(fnames)
+  n_batch    <- length(unique(batches))
+  panel      <- GetPanels(fnames[1], ...)[[1]]
+  use_gating <- !is.null(gating_fun) && !is.null(gate_names)
+  if (use_gating) {
+    gate_names <- sort(as.character(gate_names))
+  }
   
   n_cols  <-
     if (!is.null(cols)) {
@@ -304,184 +544,299 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
   
   if (verbose) {
     message(paste0(
-      'Training ', n_cols, '-channel CytoNorm normalization model on ',
-      n_fcs,
-      ' FCS ',
-      if (n_fcs>1) 'files' else 'file',
-      ' across ',
-      n_batch,
-      ' experimental ',
+      'Training CytoNorm normalization model for batch-effect correction',
+      '\n• Number of normalizable channels: ', n_cols,
+      '\n• Input data: ', n_fcs, ' FCS ', if (n_fcs>1) 'files' else 'file',
+      ' across ', n_batch, ' experimental ',
       if (n_batch>1) 'batches' else 'batch',
-      '\nUsing ', cores, ' CPU cores'
+      '\n• Separate normalization functions will be trained per ',
+      if (!use_gating) { 'FlowSOM metacluster' } else { 'gate' },
+      '\n• Using ', cores, ' CPU cores'
     ))
   }
   
-  ## Obtain a FlowSOM model
-  
-  if (is.null(fsom)) {
+  if (!use_gating) {
+    
+    ## Obtain a FlowSOM model
+    
+    if (is.null(fsom)) {
+      
+      if (verbose) {
+        message('Training a FlowSOM normalization model')
+      }
+      
+      fsom.nCells    <- fsom_params[['nCells']]
+      fsom.colsToUse <- fsom_params[['colsToUse']]
+      if (is.null(fsom.colsToUse) && !is.null(cols)) {
+        fsom.colsToUse <- cols
+      }
+      pars           <- fsom_params[
+        grep('nCells|channels|colsToUse', names(fsom_params), invert = TRUE)
+      ]
+      suppressMessages({
+        fsom <- CytoNorm::prepareFlowSOM(
+          files          = fnames,
+          colsToUse      = fsom.colsToUse,
+          nCells         = fsom.nCells,
+          FlowSOM.params = pars,
+          seed           = seed,
+          verbose        = FALSE,
+          ...
+        )
+      })
+    } else {
+      
+      if (verbose) {
+        message('Using a precomputed FlowSOM normalization model')
+      }
+    }
+    
+    ## Additional consistency check
+    
+    if ('goal'%in%names(norm_params) && is.list(norm_params[['goal']])) {
+      stopifnot(
+        'Metacluster count in goal distribution and FlowSOM model is different' =
+          length(norm_params[['goal']])==FlowSOM::NMetaclusters(fsom)
+      )
+    }
+    
+    ## Split samples by metaclusters
     
     if (verbose) {
-      message('Training a FlowSOM normalization model')
+      message(
+        'Splitting training samples into ', FlowSOM::NMetaclusters(fsom) ,
+        ' FlowSOM metaclusters'
+      )
     }
     
-    fsom.nCells    <- fsom_params[['nCells']]
-    fsom.colsToUse <- fsom_params[['colsToUse']]
-    if (is.null(fsom.colsToUse) && !is.null(cols)) {
-      fsom.colsToUse <- cols
-    }
-    pars           <- fsom_params[
-      grep('nCells|channels|colsToUse', names(fsom_params), invert = TRUE)
-    ]
-    suppressMessages({
-      fsom <- CytoNorm::prepareFlowSOM(
-        files          = fnames,
-        colsToUse      = fsom.colsToUse,
-        nCells         = fsom.nCells,
-        FlowSOM.params = pars,
-        seed           = seed,
-        verbose        = FALSE,
+    meta_split <-
+      .SplitSamplesByMetaclusters(
+        fnames    = fnames,
+        batches   = batches,
+        fsom      = fsom,
+        fpath_out = tmp,
+        cols      = intersect(colnames(fsom$map$codes), cols),
+        cores     = cores,
+        verbose   = verbose,
         ...
       )
-    })
-  } else {
+    
+    ## Import multi-threading functions
+    
+    makeCluster    <- snow::makeCluster
+    registerDoSNOW <- doSNOW::registerDoSNOW
+    foreach        <- foreach::foreach
+    `%dopar%`      <- foreach::`%dopar%`
+    stopCluster    <- snow::stopCluster
+    
+    ## Model metacluster-channel distributions by batch
     
     if (verbose) {
-      message('Using a precomputed FlowSOM normalization model')
+      message('Modeling metacluster-channel distributions by batch')
     }
-  }
-  
-  ## Additional consistency checks
-  
-  if ('goal'%in%names(norm_params) && is.list(norm_params[['goal']])) {
-    stopifnot(
-      'Metacluster count in goal distribution and FlowSOM model is different' =
-        length(norm_params[['goal']])==FlowSOM::NMetaclusters(fsom)
+    
+    if (is.null(cols)) {
+      cols <- GetPanels(fnames[1])[[1]]$Channel
+    }
+    
+    umcl <- levels(FlowSOM::GetMetaclusters(fsom))
+    nmcl <- length(umcl)
+    
+    packages <- c()
+    
+    clu <- makeCluster(cores)
+    registerDoSNOW(clu)
+    
+    if (verbose) {
+      pb <- utils::txtProgressBar(min = 0, max = nmcl, style = 3)
+      opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
+    } else {
+      opts <- list()
+    }
+    
+    mcl_res <- foreach( # iterate over metaclusters asynchronously
+      i             = seq_along(umcl),
+      .combine      = c,
+      .inorder      = TRUE,
+      .final        = NULL,
+      .packages     = packages,
+      .options.snow = opts
+    ) %dopar% {
+      
+      mcl <- umcl[i]
+      
+      mask   <- meta_split$Metacluster==mcl
+      files  <- meta_split$FileName[mask]
+      labels <- as.character(meta_split$Batch[mask])
+      
+      pars <- c(
+        list(
+          'files'         = files,
+          'labels'        = labels,
+          'channels'      = cols,
+          'transformList' = NULL,
+          'verbose'       = verbose,
+          'plot'          = FALSE
+        ),
+        norm_params,
+        list(...)
+      )
+      if (is.list(pars[['goal']])) {
+        pars[['goal']] <- pars[['goal']][[mcl]]
+      }
+      
+      suppressMessages({
+        res <- list(do.call(
+          normMethod.train, pars
+        ))
+      })
+      names(res) <- mcl
+      return(res)
+    }
+    
+    if (verbose) {
+      close(pb)
+    }
+    stopCluster(clu)
+    invisible(gc())
+    rm(clu)
+    invisible(gc())
+    
+    invisible(suppressWarnings({
+      file.remove(meta_split$FileName)  
+    }))
+    
+    res <- list(
+      'fsom'       = fsom,
+      'clusterRes' = mcl_res
     )
-  }
-  if ('nQ' %in% names(norm_params)) {
-    stopifnot(
-      'Quantile count in goal distribution and CytoNorm call is different' =
-        nrow(norm_params[['goal']][[1]])==norm_params[['nQ']]
-    )
-  }
-  
-  ## Split samples by metaclusters
-  
-  if (verbose) {
-    message('Splitting training samples into metaclusters')
-  }
-  
-  meta_split <-
-    .SplitSamplesByMetaclusters(
-      fnames    = fnames,
-      batches   = batches,
-      fsom      = fsom,
-      fpath_out = tmp,
-      cols      = intersect(colnames(fsom$map$codes), cols),
-      cores     = cores,
-      verbose   = verbose,
-      ...
-    )
-  
-  ## Import multi-threading functions
-  
-  makeCluster    <- snow::makeCluster
-  registerDoSNOW <- doSNOW::registerDoSNOW
-  foreach        <- foreach::foreach
-  `%dopar%`      <- foreach::`%dopar%`
-  stopCluster    <- snow::stopCluster
-  
-  ## Model metacluster-channel distributions by batch
-  
-  if (verbose) {
-    message('Modeling metacluster-channel distributions by batch')
-  }
-  
-  if (is.null(cols)) {
-    cols <- GetPanels(fnames[1])[[1]]$Channel
-  }
-  
-  umcl <- levels(FlowSOM::GetMetaclusters(fsom))
-  nmcl <- length(umcl)
-  
-  packages <- c()
-  
-  clu <- makeCluster(cores)
-  registerDoSNOW(clu)
-  
-  if (verbose) {
-    pb <- utils::txtProgressBar(min = 0, max = nmcl, style = 3)
-    opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
   } else {
-    opts <- list()
-  }
-  
-  mcl_res <- foreach( # iterate over FCS files asynchronously
-    i             = seq_along(umcl),
-    .combine      = c,
-    .inorder      = TRUE,
-    .final        = NULL,
-    .packages     = packages,
-    .options.snow = opts
-  ) %dopar% {
     
-    mcl <- umcl[i]
+    ## Split samples by gates
     
-    mask   <- meta_split$Metacluster==mcl
-    files  <- meta_split$FileName[mask]
-    labels <- as.character(meta_split$Batch[mask])
+    ng <- length(gate_names)
     
-    pars <- c(
-      list(
-        'files'         = files,
-        'labels'        = labels,
-        'channels'      = cols,
-        'transformList' = NULL,
-        'verbose'       = verbose,
-        'plot'          = FALSE
-      ),
-      norm_params,
-      list(...)
-    )
-    if (is.list(pars[['goal']])) {
-      pars[['goal']] <- pars[['goal']][[mcl]]
+    if (verbose) {
+      message(
+        'Splitting training samples into ', ng, ' gates:\n\t',
+        paste0(gate_names, collapse = ', ')
+      )
     }
     
-    suppressMessages({
-      res <- list(do.call(
-        normMethod.train, pars
-      ))
-    })
-    names(res) <- mcl
-    return(res)
+    gate_split <-
+      .SplitSamplesByGates(
+        fnames     = fnames,
+        batches    = batches,
+        gating_fun = gating_fun,
+        gate_names = gate_names,
+        fpath_out  = tmp,
+        cols       = cols,
+        cores      = cores,
+        verbose    = verbose,
+        ...
+      )
+    
+    ## Import multi-threading functions
+    
+    makeCluster    <- snow::makeCluster
+    registerDoSNOW <- doSNOW::registerDoSNOW
+    foreach        <- foreach::foreach
+    `%dopar%`      <- foreach::`%dopar%`
+    stopCluster    <- snow::stopCluster
+    
+    ## Model gate-channel distributions by batch
+    
+    if (verbose) {
+      message('Modeling gate-channel distributions by batch')
+    }
+    
+    if (is.null(cols)) {
+      cols <- GetPanels(fnames[1])[[1]]$Channel
+    }
+    
+    packages <- c()
+    
+    clu <- makeCluster(cores)
+    registerDoSNOW(clu)
+    
+    if (verbose) {
+      pb <- utils::txtProgressBar(min = 0, max = ng, style = 3)
+      opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
+    } else {
+      opts <- list()
+    }
+    
+    gate_res <- foreach( # iterate over gates asynchronously
+      i             = seq_along(gate_names),
+      .combine      = c,
+      .inorder      = TRUE,
+      .final        = NULL,
+      .packages     = packages,
+      .options.snow = opts
+    ) %dopar% {
+      
+      gate <- gate_names[i]
+      
+      mask   <- gate_split$Gate==gate
+      files  <- gate_split$FileName[mask]
+      labels <- as.character(gate_split$Batch[mask])
+      
+      pars <- c(
+        list(
+          'files'         = files,
+          'labels'        = labels,
+          'channels'      = cols,
+          'transformList' = NULL,
+          'verbose'       = verbose,
+          'plot'          = FALSE
+        ),
+        norm_params,
+        list(...)
+      )
+      if (is.list(pars[['goal']])) {
+        pars[['goal']] <- pars[['goal']][[gate]]
+      }
+      
+      suppressMessages({
+        res <- list(do.call(
+          normMethod.train, pars
+        ))
+      })
+      names(res) <- gate
+      return(res)
+    }
+    
+    if (verbose) {
+      close(pb)
+    }
+    stopCluster(clu)
+    invisible(gc())
+    rm(clu)
+    invisible(gc())
+    
+    invisible(suppressWarnings({
+      file.remove(gate_split$FileName)  
+    }))
+    
+    attributes(gating_fun)$gate_names <- gate_names
+    res <- list(
+      'gating'     = gating_fun,
+      'clusterRes' = gate_res
+    )
   }
   
-  if (verbose) {
-    close(pb)
-  }
-  stopCluster(clu)
-  invisible(gc())
-  rm(clu)
-  invisible(gc())
   
-  invisible(suppressWarnings({
-    file.remove(meta_split$FileName)  
-  }))
-  
-  res <- list(
-    'fsom'       = fsom,
-    'clusterRes' = mcl_res
-  )
-  attributes(res)$class   <- 'cytoSNOW_CytoNormModel'
-  attributes(res)$n_cols  <- n_cols
-  attributes(res)$cols    <- cols
-  attributes(res)$n_batch <- n_batch
-  attributes(res)$n_fcs   <- n_fcs
+  attributes(res)$class           <- 'cytoSNOW_CytoNormModel'
+  attributes(res)$splitting_model <- ifelse(use_gating, 'gating', 'fsom')
+  attributes(res)$n_cols          <- n_cols
+  attributes(res)$cols            <- cols
+  attributes(res)$n_batch         <- n_batch
+  attributes(res)$n_fcs           <- n_fcs
   
   return(res)
 }
 
-#' Parallel normalization model application
+#' Parallel application of normalization model
 #'
 #' Applies a CytoNorm batch effect correction model, trained via 
 #' [cytoSNOW::ParallelNormalize.Train()], to FCS files affected by batch effect.
@@ -515,6 +870,8 @@ ParallelNormalize.Train <- ParallelNormalise.Train <- function(
 #'
 #' @seealso [CytoNorm::CytoNorm.normalize()] for the original CytoNorm 
 #' normalization function
+#' @seealso [cytoSNOW::ParallelNormalize.Train()] for training the normalization 
+#' model that this function can then apply
 #' 
 #' @export
 ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
@@ -590,213 +947,409 @@ ParallelNormalize.Apply <- ParallelNormalise.Apply <- function(
   n_batch <- length(unique(batches))
   cols    <- attributes(model)$cols
   n_cols  <- attributes(model)$n_cols
-  fsom    <- model$fsom
+  
+  use_gating <- attributes(model)$splitting_model=='gating'
   
   if (verbose) {
     message(paste0(
-      'Applying ', n_cols, '-channel CytoNorm normalization model to ',
-      n_fcs,
-      ' FCS ',
-      if (n_fcs>1) 'files' else 'file',
-      ' across ',
-      n_batch,
-      ' experimental ',
+      'Applying CytoNorm normalization model for batch-effect correction',
+      '\n• Number of normalizable channels: ', n_cols,
+      '\n• Input data: ', n_fcs, ' FCS ', if (n_fcs>1) 'files' else 'file',
+      ' across ', n_batch, ' experimental ',
       if (n_batch>1) 'batches' else 'batch',
-      '\nUsing ', cores, ' CPU cores'
+      '\n• Separate normalization functions will be applied per ',
+      if (!use_gating) { 'FlowSOM metacluster' } else { 'gate' },
+      '\n• Using ', cores, ' CPU cores'
     ))
   }
   
-  ## Split samples by metaclusters
-  
-  if (verbose) {
-    message('Splitting target samples into metaclusters')
-  }
-  
-  meta_split <-
-    .SplitSamplesByMetaclusters(
-      fnames    = fnames,
-      batches   = batches,
-      fsom      = fsom,
-      fpath_out = tmp,
-      cols      = intersect(colnames(fsom$map$codes), cols),
-      cores     = cores,
-      verbose   = verbose,
-      ...
-    )
-  
-  ## Import multi-threading functions
-  
-  makeCluster    <- snow::makeCluster
-  registerDoSNOW <- doSNOW::registerDoSNOW
-  foreach        <- foreach::foreach
-  `%dopar%`      <- foreach::`%dopar%`
-  stopCluster    <- snow::stopCluster
-  
-  ## Apply metacluster-channel normalizations
-  
-  if (verbose) {
-    message('Applying metacluster-channel normalizations by batch')
-  }
-  
-  if (is.null(cols)) {
-    cols <- GetPanels(fnames[1])[[1]]$Channel
-  }
-  
-  umcl <- levels(FlowSOM::GetMetaclusters(fsom))
-  nmcl <- length(umcl)
-  
-  packages <- c()
-  
-  clu <- makeCluster(cores)
-  registerDoSNOW(clu)
-  
-  if (verbose) {
-    pb <- utils::txtProgressBar(min = 0, max = nmcl, style = 3)
-    opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
-  } else {
-    opts <- list()
-  }
-  
-  meta_norm <- foreach( # iterate over metaclusters asynchronously
-    i             = seq_along(umcl),
-    .combine      = rbind,
-    .inorder      = TRUE,
-    .final        = NULL,
-    .packages     = packages,
-    .options.snow = opts
-  ) %dopar% {
+  if (!use_gating) {
     
-    mcl <- umcl[i]
-    mask <-
-      meta_split$Metacluster==mcl & file.exists(meta_split$FileName)
-    # ^ allow for non-existent split files if metacluster empty
+    ## Split samples by metaclusters
     
-    if (!any(mask)) {
-      return(NULL)
+    fsom <- model$fsom
+    nmcl <- FlowSOM::NMetaclusters(fsom)
+    
+    if (verbose) {
+      message('Splitting target samples into ', nmcl, ' FlowSOM metaclusters')
     }
     
-    fnames_mcl  <- meta_split$FileName[mask]
-    batches_mcl <- meta_split$Batch[mask]
-    samples_mcl <- meta_split$Sample[mask]
-    
-    normMethod.normalize(
-      model                 = model$clusterRes[[mcl]],
-      files                 = fnames_mcl,
-      labels                = batches_mcl,
-      outputDir             = fpath_out,
-      prefix                = prefix,
-      transformList         = NULL,
-      transformList.reverse = NULL,
-      removeOriginal        = FALSE,
-      verbose               = FALSE,
-      ...
-    )
-    
-    return(
-      data.frame(
-        'Metacluster' = mcl,
-        'FileName'    =
-          file.path(fpath_out, paste0(prefix, basename(fnames_mcl))),
-        'Sample'      = samples_mcl,
-        'Batch'       = batches_mcl
+    meta_split <-
+      .SplitSamplesByMetaclusters(
+        fnames    = fnames,
+        batches   = batches,
+        fsom      = fsom,
+        fpath_out = tmp,
+        cols      = intersect(colnames(fsom$map$codes), cols),
+        cores     = cores,
+        verbose   = verbose,
+        ...
       )
-    )
-  }
-  
-  if (verbose) {
-    close(pb)
-  }
-  stopCluster(clu)
-  invisible(gc())
-  rm(clu)
-  invisible(gc())
-  
-  invisible(suppressWarnings({
-    file.remove(meta_split$FileName)  
-  }))
-  
-  ## Stitch normalized split data back together
-  
-  if (verbose) {
-    message('Stitching normalized split data back together')
-  }
-  
-  packages <- c('flowCore', 'FlowSOM')
-  
-  codes <- fsom$map$codes[
-    , intersect(cols, colnames(fsom$map$codes)), drop = FALSE
-  ]
-  meta  <- fsom$metaclustering
-  
-  clu <- makeCluster(cores)
-  registerDoSNOW(clu)
-  
-  if (verbose) {
-    pb <- utils::txtProgressBar(min = 0, max = length(fnames), style = 3)
-    opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
-  } else {
-    opts <- list()
-  }
-  
-  out <- foreach( # iterate over files asynchronously
-    i             = seq_along(fnames),
-    .inorder      = FALSE,
-    .final        = NULL,
-    .packages     = packages,
-    .options.snow = opts
-  ) %dopar% {
     
-    fname <- fnames[i]
-    suppressWarnings({
-      ff <- read.FCS(fname, ...)
-    })
-    d <- ff@exprs[, cols, drop = FALSE]
+    ## Import multi-threading functions
     
-    mcls <- # metacluster label per cell
-      meta[FlowSOM:::MapDataToCodes(
-        codes   = codes[, intersect(colnames(codes), colnames(d))],
-        newdata = d
-      )[, 1]]
+    makeCluster    <- snow::makeCluster
+    registerDoSNOW <- doSNOW::registerDoSNOW
+    foreach        <- foreach::foreach
+    `%dopar%`      <- foreach::`%dopar%`
+    stopCluster    <- snow::stopCluster
     
-    for (j in seq_along(umcl)) {
+    ## Apply metacluster-channel normalizations
+    
+    if (verbose) {
+      message('Applying metacluster-channel normalizations by batch')
+    }
+    
+    if (is.null(cols)) {
+      cols <- GetPanels(fnames[1])[[1]]$Channel
+    }
+    
+    umcl <- levels(FlowSOM::GetMetaclusters(fsom))
+    nmcl <- length(umcl)
+    
+    packages <- c()
+    
+    clu <- makeCluster(cores)
+    registerDoSNOW(clu)
+    
+    if (verbose) {
+      pb <- utils::txtProgressBar(min = 0, max = nmcl, style = 3)
+      opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
+    } else {
+      opts <- list()
+    }
+    
+    meta_norm <- foreach( # iterate over metaclusters asynchronously
+      i             = seq_along(umcl),
+      .combine      = rbind,
+      .inorder      = TRUE,
+      .final        = NULL,
+      .packages     = packages,
+      .options.snow = opts
+    ) %dopar% {
       
-      mcl       <- umcl[j]
-      mask      <- meta_norm$Sample==fname & meta_norm$Metacluster==mcl
-      if (any(mask)) {
-        
-        fname_mcl <- meta_norm$FileName[mask]
-        ff_subset <- flowCore::read.FCS(fname_mcl, ...)
-        ff@exprs[mcls==mcl, ] <- ff_subset@exprs
+      mcl <- umcl[i]
+      mask <-
+        meta_split$Metacluster==mcl & file.exists(meta_split$FileName)
+      # ^ allow for non-existent split files if metacluster empty
+      
+      if (!any(mask)) {
+        return(NULL)
       }
+      
+      fnames_mcl  <- meta_split$FileName[mask]
+      batches_mcl <- meta_split$Batch[mask]
+      samples_mcl <- meta_split$Sample[mask]
+      
+      normMethod.normalize(
+        model                 = model$clusterRes[[mcl]],
+        files                 = fnames_mcl,
+        labels                = batches_mcl,
+        outputDir             = fpath_out,
+        prefix                = prefix,
+        transformList         = NULL,
+        transformList.reverse = NULL,
+        removeOriginal        = FALSE,
+        verbose               = FALSE,
+        ...
+      )
+      
+      return(
+        data.frame(
+          'Metacluster' = mcl,
+          'FileName'    =
+            file.path(fpath_out, paste0(prefix, basename(fnames_mcl))),
+          'Sample'      = samples_mcl,
+          'Batch'       = batches_mcl
+        )
+      )
     }
     
-    ff <- ValidateFCS(exprs = ff@exprs, ff = ff)
-    fname_out <-
-      file.path(
-        fpath_out,
-        if (keep_full_paths) {
-          paste0(prefix, gsub('[:/]', '_', fname))
-        } else {
-          paste0(prefix, basename(fname))
+    if (verbose) {
+      close(pb)
+    }
+    stopCluster(clu)
+    invisible(gc())
+    rm(clu)
+    invisible(gc())
+    
+    invisible(suppressWarnings({
+      file.remove(meta_split$FileName)  
+    }))
+    
+    ## Stitch normalized split data back together
+    
+    if (verbose) {
+      message('Stitching normalized split data back together')
+    }
+    
+    packages <- c('flowCore', 'FlowSOM')
+    
+    codes <- fsom$map$codes[
+      , intersect(cols, colnames(fsom$map$codes)), drop = FALSE
+    ]
+    meta  <- fsom$metaclustering
+    
+    clu <- makeCluster(cores)
+    registerDoSNOW(clu)
+    
+    if (verbose) {
+      pb <- utils::txtProgressBar(min = 0, max = length(fnames), style = 3)
+      opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
+    } else {
+      opts <- list()
+    }
+    
+    out <- foreach( # iterate over files asynchronously
+      i             = seq_along(fnames),
+      .inorder      = FALSE,
+      .final        = NULL,
+      .packages     = packages,
+      .options.snow = opts
+    ) %dopar% {
+      
+      fname <- fnames[i]
+      suppressWarnings({
+        ff <- read.FCS(fname, ...)
+      })
+      d <- ff@exprs[, cols, drop = FALSE]
+      
+      mcls <- # metacluster label per cell
+        meta[FlowSOM:::MapDataToCodes(
+          codes   = codes[, intersect(colnames(codes), colnames(d))],
+          newdata = d
+        )[, 1]]
+      
+      for (j in seq_along(umcl)) {
+        
+        mcl       <- umcl[j]
+        mask      <- meta_norm$Sample==fname & meta_norm$Metacluster==mcl
+        if (any(mask)) {
+          
+          fname_mcl <- meta_norm$FileName[mask]
+          ff_subset <- flowCore::read.FCS(fname_mcl, ...)
+          ff@exprs[mcls==mcl, ] <- ff_subset@exprs
         }
+      }
+      
+      ff <- ValidateFCS(exprs = ff@exprs, ff = ff)
+      fname_out <-
+        file.path(
+          fpath_out,
+          if (keep_full_paths) {
+            paste0(prefix, gsub('[:/]', '_', fname))
+          } else {
+            paste0(prefix, basename(fname))
+          }
+        )
+      suppressWarnings({
+        flowCore::write.FCS(ff, fname_out)
+      })
+      return(invisible(NULL))
+    }
+    
+    if (verbose) {
+      close(pb)
+    }
+    stopCluster(clu)
+    invisible(gc())
+    rm(clu)
+    invisible(gc())
+    
+    invisible(suppressWarnings({
+      file.remove(meta_norm$FileName)  
+    }))
+    
+  } else {
+    
+    ## Split samples by gates
+    
+    gating_fun <- model$gating
+    gate_names <- attributes(gating_fun)$gate_names
+    ng         <- length(gate_names)
+    
+    if (verbose) {
+      message(
+        'Splitting target samples into ', ng, ' gates:\n\t',
+        paste0(gate_names, collapse = ', ')
       )
-    suppressWarnings({
-      flowCore::write.FCS(ff, fname_out)
-    })
-    return(invisible(NULL))
+    }
+    
+    gate_split <-
+      .SplitSamplesByGates(
+        fnames     = fnames,
+        batches    = batches,
+        gating_fun = gating_fun,
+        gate_names = gate_names,
+        fpath_out  = tmp,
+        cols       = cols,
+        cores      = cores,
+        verbose    = verbose,
+        ...
+      )
+    
+    ## Import multi-threading functions
+    
+    makeCluster    <- snow::makeCluster
+    registerDoSNOW <- doSNOW::registerDoSNOW
+    foreach        <- foreach::foreach
+    `%dopar%`      <- foreach::`%dopar%`
+    stopCluster    <- snow::stopCluster
+    
+    ## Apply gate-channel normalizations
+    
+    if (verbose) {
+      message('Applying gate-channel normalizations by batch')
+    }
+    
+    if (is.null(cols)) {
+      cols <- GetPanels(fnames[1])[[1]]$Channel
+    }
+    
+    packages <- c()
+    
+    clu <- makeCluster(cores)
+    registerDoSNOW(clu)
+    
+    if (verbose) {
+      pb <- utils::txtProgressBar(min = 0, max = ng, style = 3)
+      opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
+    } else {
+      opts <- list()
+    }
+    
+    gate_norm <- foreach( # iterate over gates asynchronously
+      i             = seq_along(gate_names),
+      .combine      = rbind,
+      .inorder      = TRUE,
+      .final        = NULL,
+      .packages     = packages,
+      .options.snow = opts
+    ) %dopar% {
+      
+      gate <- gate_names[i]
+      mask <-
+        gate_split$Gate==gate & file.exists(gate_split$FileName)
+      # ^ allow for non-existent split files if metacluster empty
+      
+      if (!any(mask)) {
+        return(NULL)
+      }
+      
+      fnames_gate  <- gate_split$FileName[mask]
+      batches_gate <- gate_split$Batch[mask]
+      samples_gate <- gate_split$Sample[mask]
+      
+      normMethod.normalize(
+        model                 = model$clusterRes[[gate]],
+        files                 = fnames_gate,
+        labels                = batches_gate,
+        outputDir             = fpath_out,
+        prefix                = prefix,
+        transformList         = NULL,
+        transformList.reverse = NULL,
+        removeOriginal        = FALSE,
+        verbose               = FALSE,
+        ...
+      )
+      
+      return(
+        data.frame(
+          'Gate'        = gate,
+          'FileName'    =
+            file.path(fpath_out, paste0(prefix, basename(fnames_gate))),
+          'Sample'      = samples_gate,
+          'Batch'       = batches_gate
+        )
+      )
+    }
+    
+    if (verbose) {
+      close(pb)
+    }
+    stopCluster(clu)
+    invisible(gc())
+    rm(clu)
+    invisible(gc())
+    
+    invisible(suppressWarnings({
+      file.remove(gate_split$FileName)  
+    }))
+    
+    ## Stitch normalized split data back together
+    
+    if (verbose) {
+      message('Stitching normalized split data back together')
+    }
+    
+    packages <- c('flowCore')
+    
+    clu <- makeCluster(cores)
+    registerDoSNOW(clu)
+    
+    if (verbose) {
+      pb <- utils::txtProgressBar(min = 0, max = length(fnames), style = 3)
+      opts <- list('progress' = function(i) utils::setTxtProgressBar(pb, i))
+    } else {
+      opts <- list()
+    }
+    
+    out <- foreach( # iterate over files asynchronously
+      i             = seq_along(fnames),
+      .inorder      = FALSE,
+      .final        = NULL,
+      .packages     = packages,
+      .options.snow = opts
+    ) %dopar% {
+      
+      fname <- fnames[i]
+      suppressWarnings({
+        ff <- read.FCS(fname, ...)
+      })
+      d <- ff@exprs[, cols, drop = FALSE]
+      
+      gates <- gating_fun(ff)
+      
+      for (j in seq_along(gate_names)) {
+        
+        gate <- gate_names[j]
+        mask <- gate_norm$Sample==fname & gate_norm$Gate==gate
+        if (any(mask)) {
+          
+          fname_gate <- gate_norm$FileName[mask]
+          ff_subset <- flowCore::read.FCS(fname_gate, ...)
+          ff@exprs[gates==gate, ] <- ff_subset@exprs
+        }
+      }
+      
+      ff <- ValidateFCS(exprs = ff@exprs, ff = ff)
+      fname_out <-
+        file.path(
+          fpath_out,
+          if (keep_full_paths) {
+            paste0(prefix, gsub('[:/]', '_', fname))
+          } else {
+            paste0(prefix, basename(fname))
+          }
+        )
+      suppressWarnings({
+        flowCore::write.FCS(ff, fname_out)
+      })
+      return(invisible(NULL))
+    }
+    
+    if (verbose) {
+      close(pb)
+    }
+    stopCluster(clu)
+    invisible(gc())
+    rm(clu)
+    invisible(gc())
+    
+    invisible(suppressWarnings({
+      file.remove(gate_norm$FileName)  
+    }))
   }
-  
-  if (verbose) {
-    close(pb)
-  }
-  stopCluster(clu)
-  invisible(gc())
-  rm(clu)
-  invisible(gc())
-  
-  invisible(suppressWarnings({
-    file.remove(meta_norm$FileName)  
-  }))
   
   return(invisible(NULL))
 }

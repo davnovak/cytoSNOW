@@ -2,7 +2,7 @@
 % Please edit documentation in R/ParallelNormalize.R
 \name{ParallelNormalize.Apply}
 \alias{ParallelNormalize.Apply}
-\title{Parallel normalization model application}
+\title{Parallel application of normalization model}
 \usage{
 ParallelNormalize.Apply(
   model,
@@ -62,4 +62,7 @@ identifiers (set \code{keep_full_paths} to TRUE), but this is discouraged.
 \seealso{
 \code{\link[CytoNorm:CytoNorm.normalize]{CytoNorm::CytoNorm.normalize()}} for the original CytoNorm
 normalization function
+
+\code{\link[=ParallelNormalize.Train]{ParallelNormalize.Train()}} for training the normalization
+model that this function can then apply
 }

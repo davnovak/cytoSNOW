@@ -2,7 +2,7 @@
 % Please edit documentation in R/ParallelNormalize.R
 \name{ParallelNormalize.Train}
 \alias{ParallelNormalize.Train}
-\title{Parallel normalization model training}
+\title{Parallel training of normalization model}
 \usage{
 ParallelNormalize.Train(
   fnames,
@@ -10,6 +10,8 @@ ParallelNormalize.Train(
   cols = NULL,
   fsom = NULL,
   fsom_params = list(nCells = 1e+06, xdim = 15, ydim = 15, nClus = 30, scale = FALSE),
+  gating_fun = NULL,
+  gate_names = NULL,
   normMethod.train = CytoNorm::QuantileNorm.train,
   norm_params = list(nQ = 99),
   seed = NULL,
@@ -29,12 +31,22 @@ which should be normalized, or \code{NULL} to use all. Defaults to \code{NULL}}
 \item{fsom}{FlowSOM object. Trained FlowSOM model with channels matching
 those in all FCS files (same panel of markers) to use for distinguishing
 cell compartments (metaclusters) to normalize separately. Or \code{NULL} to train
-a new one, using \code{fsom_params} as the training parameters. Defaults to \code{NULL}}
+a new one using \code{fsom_params} as the training parameters, or to use a gating
+model instead of FlowSOM. Defaults to \code{NULL}}
 
 \item{fsom_params}{named list. Parameters to pass to
 \code{\link[CytoNorm:prepareFlowSOM]{CytoNorm::prepareFlowSOM()}} for the FlowSOM model training. Ignored if
-\code{fsom} is specified. Must have at least \emph{'nCells'} specified. See \emph{Details}
+\code{fsom} is specified or using a gating model instead. If specified,
+\code{fsom_params} must give at least the \emph{'nCells'} specified. See \emph{Details}
 for defaults}
+
+\item{gating_fun}{function. Takes a \link[flowCore:flowFrame-class]{flowCore::flowFrame} object as input and
+returns a gate label per event. Or \code{NULL} to use FlowSOM for splitting files
+instead. Defaults to \code{NULL}}
+
+\item{gate_names}{vector. Names of all gates from \code{gating_fun}. Or \code{NULL} to
+use FlowSOM for splitting files. Must be specified if \code{gating_fun} is
+specified. Defaults to \code{NULL}}
 
 \item{normMethod.train}{training function of the signal normalization method
 to use. Defaults to \code{CytoNorm::QuantileNorm.train}}
@@ -52,13 +64,16 @@ least 2). Defaults to number of detectable cores minus 1}
 \item{...}{optional additional named parameters for \code{\link[flowCore:read.FCS]{flowCore::read.FCS()}}}
 }
 \value{
-list with named elements for the normalization FlowSOM model
-(\emph{'fsom'}) and the CytoNorm normalization model itself (\emph{'clusterRes'}).
-These names were chosen for compatibility with CytoNorm
+list with named elements for the CytoNorm normalization model
+(\emph{'clusterRes'}) and the splitting model: either FlowSOM (\emph{'fsom'}) or the
+custom gating model (\emph{'gating'}).
 }
 \description{
-Trains a batch effect correction model using CytoNorm. This model can later
-be applied using \code{\link[=ParallelNormalize.Apply]{ParallelNormalize.Apply()}}.
+Trains a batch-effect correction model using CytoNorm. This model can later
+be applied using \code{\link[=ParallelNormalize.Apply]{ParallelNormalize.Apply()}}. Instead of using
+FlowSOM clustering for splitting files into compartments, a custom gating
+function can be used (see the \code{gating_fun} and \code{gate_names} parameters and
+the \emph{Details} section).
 }
 \details{
 This function uses parallelization via a SNOW cluster for speed-up.
@@ -70,6 +85,17 @@ clustering) are not specified here, the value of \code{cols} (all channels that
 should be normalized) is used. If \code{cols} is also not specified, all channels
 in the panel are used. It is strongly recommended to specify both the \code{cols}
 parameter, and the \code{colsToUse} slot of \code{fsom_params}.
+
+A gating model can be used to split FCS files instead of a FlowSOM model. To
+do this, two input parameters need to be specified. First, a gating function
+that takes a \link[flowCore:flowFrame-class]{flowCore::flowFrame} as input and returns a vector of gate
+labels as output (\code{gating_fun}). Second, a vector with the names of all gates
+that \code{gating_fun} can output (\code{gate_names}). If both are specified, the
+FlowSOM model and/or parameters are ignored. Instead of splitting training
+FCS files by metacluster to train a separate normalization function for each
+of them, they are split by gate, as defined by the user's function. This
+gives more control and ensures that the model doesn't skew genuine
+differential abundances of known cell types across batches.
 }
 \note{
 The original \code{\link[CytoNorm:CytoNorm.train]{CytoNorm::CytoNorm.train()}} function includes a \code{transformList}
@@ -81,8 +107,16 @@ normalization.
 
 Note that this function generates temporary files in the \code{\link[=tempdir]{tempdir()}}
 directory, which it then automatically removes when done.
+
+If a FlowSOM model (not gating) is used for the splitting of files, the
+trained normalization model is compatible with the original
+\code{\link[CytoNorm:CytoNorm.normalize]{CytoNorm::CytoNorm.normalize()}} function for applying the normalization.
+However, we recommend the use of \code{\link[=ParallelNormalize.Apply]{ParallelNormalize.Apply()}}.
 }
 \seealso{
 \code{\link[CytoNorm:CytoNorm.train]{CytoNorm::CytoNorm.train()}} for the original CytoNorm training
 function
+
+\code{\link[=ParallelNormalize.Apply]{ParallelNormalize.Apply()}} for applying the trained
+normalization model
 }
