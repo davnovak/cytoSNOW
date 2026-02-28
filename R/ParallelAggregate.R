@@ -31,6 +31,12 @@
 #' Defaults to `NULL`
 #' @param metacluster integer. Metacluster number to extract events, if FlowSOM
 #' model is specified. Defaults to 1
+#' @param gating_fun function or `NULL`. Takes a [flowCore::flowFrame] object as
+#' input and returns a gate label or logical value per event. Defaults to `NULL`
+#' @param gate string or `NULL`. Name of gate to retain. If `gating_fun` is 
+#' specified but `gate` is not given, `gating_fun` is expected to output Boolean 
+#' flags, and events that get a `TRUE` label are retained. Defaults to `NULL`
+
 #' @param verbose logical. Whether to indicate progress. Defaults to `TRUE`
 #' @param ... optional additional named parameters for [flowCore::read.FCS()]
 #'
@@ -42,9 +48,12 @@
 #' cells, in which case all their events are taken and the sample sizes for
 #' other files is increased to make up for this.
 #'
-#' If a corresponding FlowSOM model with metaclustering is given, we can choose
-#' to extract only events that get mapped onto a specific metacluster.
-#' In this case, up to `N/n` events per sample are picked greedily.
+#' If a corresponding FlowSOM model with metaclustering is given (`fsom`), we 
+#' can choose to extract only events that get mapped onto a specific 
+#' metacluster. In this case, up to `N/n` events per sample are picked greedily.
+#' 
+#' If a gating model is given (`gating_fun`), we can choose to extract only 
+#' events that get mapped onto a specific
 #'
 #' The aggregate gets extra columns: *'File'* with index of FCS file of origin
 #' per event and *'OriginalIndex'* with index of each event within its FCS file
@@ -76,6 +85,8 @@ ParallelAggregate <- function(
     guid            = 'Aggregate.fcs',
     fsom            = NULL,
     metacluster     = 1,
+    gating_fun      = NULL,
+    gate            = NULL,
     verbose         = TRUE,
     ...
 ) {
@@ -129,20 +140,31 @@ ParallelAggregate <- function(
               length(metacluster)==1 && metacluster>0)
   stopifnot('`metacluster` is out of bounds of `fsom` metaclustering' =
               is.null(fsom) || metacluster%in%levels(fsom$metaclustering))
+  stopifnot('If specified, `gating_fun` must be a function' =
+              is.null(gating_fun) || is.function(gating_fun))
+  stopifnot('If specified, `gate` must be a single string' =
+              is.null(gate) || (is.character(gate) && length(gate)==1))
   stopifnot('`verbose` must be a single logical' =
               is.logical(verbose) && length(verbose)==1)
 
   ## Init
 
-  note_batch <- !is.null(batches)
-  select_mc  <- !is.null(fsom)
-  take_all   <- is.null(N) || is.infinite(N)
-  n_files    <- length(fnames)
+  note_batch  <- !is.null(batches)
+  select_gate <- !is.null(gating_fun)
+  select_mc   <- !is.null(fsom) && !select_gate
+  take_all    <- is.null(N) || is.infinite(N)
+  n_files     <- length(fnames)
 
   if (verbose) {
     if (select_mc) {
       msg <- paste0('Aggregating metacluster ', metacluster,
                     ' expression data from ', n_files, ' FCS files')
+    } else if (select_gate) {
+      msg <- paste0(
+        'Aggregating ',
+        if (is.null(gate)) { 'pre-gated' } else { paste0('"', gate, '"') },
+        ' expression data from ', n_files, ' FCS files'
+      )
     } else {
       msg <- paste0('Aggregating expression data from ', n_files, ' FCS files')
     }
@@ -166,7 +188,10 @@ ParallelAggregate <- function(
 
   ## Determine sample size per file
 
-  if (is.null(fsom)) {
+  if (select_mc || select_gate) {
+    # ^ metacluster/gate selected? take up to N/n_files greedily
+    s_perfile <- rep(ceiling(N/n_files), times = n_files)
+  } else {
     s_full    <- sapply( # FCS file sizes
       fnames, function(f) {
         as.integer(flowCore::read.FCSheader(f, keyword = '$TOT')[[1]][['$TOT']])
@@ -185,10 +210,8 @@ ParallelAggregate <- function(
       s_adjusted            <- ceiling((N-sum(s_perfile, na.rm = TRUE))/n_large)
       s_perfile[mask_large] <- s_adjusted
     }
-  } else { # metacluster selected? take up to N/n_files greedily
-    s_perfile <- rep(ceiling(N/n_files), times = n_files)
   }
-
+  
   ## Set up SNOW cluster & progress bar
 
   cl <- makeCluster(cores)
@@ -241,19 +264,33 @@ ParallelAggregate <- function(
     .packages     = packages,
     .options.snow = opts
   ) %dopar% {
-
+    
     if (!is.null(cols)&&length(cols)>0) {
-      d <- flowCore::read.FCS(fnames[i], ...)[, cols, drop = FALSE]@exprs
+      ff <- flowCore::read.FCS(fnames[i], ...)[, cols, drop = FALSE]
     } else {
-      d <- flowCore::read.FCS(fnames[i], ...)@exprs
+      ff <- flowCore::read.FCS(fnames[i], ...)
     }
-    if (select_mc) {
+    if (select_gate) {
+      if (is.null(gate)) {
+        gate_idcs <- which(gating_fun(ff))
+      } else {
+        gate_idcs <- which(gating_fun(ff)==gate)
+      }
+      d <- ff@exprs[gate_idcs, , drop = FALSE]
+      rm(ff)
+    } else if (select_mc) {
+      d <- ff@exprs
+      rm(ff)
       mc_idcs <- which(
         meta[FlowSOM:::MapDataToCodes(codes, d)[, 1]]==metacluster
       )
       d <- d[mc_idcs, , drop = FALSE]
+    } else {
+      d <- ff@exprs
+      rm(ff)
     }
     nd <- nrow(d)
+    idcs <- f_cell_idcs(nd, s)
     if (nd<2) {
       return(f_annotate(d, i, idcs))
     }
@@ -261,7 +298,6 @@ ParallelAggregate <- function(
     if (!is.null(seed)) {
       set.seed(seed)
     }
-    idcs <- f_cell_idcs(nd, s)
     d <- d[idcs, , drop = FALSE]
     return(f_annotate(d, i, idcs))
   }
@@ -273,6 +309,7 @@ ParallelAggregate <- function(
   invisible(gc())
   rm(cl)
   invisible(gc())
+  stopifnot('No events sampled' = nrow(res)>0)
 
   ## Convert to flowFrame if requested
 
@@ -299,6 +336,7 @@ ParallelAggregate <- function(
   attributes(res)[['fnames']]      <- fnames
   attributes(res)[['seed']]        <- seed
   attributes(res)[['metacluster']] <- if (select_mc) metacluster else NULL
+  attributes(res)[['gate']]        <- if (select_gate) gate else NULL
 
   res
 }

@@ -89,6 +89,7 @@ In addition to this, it offers **extra functions that the base packages do not d
 
 + `GetPanels` efficiently extracts names of channels and markers from FCS files without opening them
 + `ValidateFCS` sanitizes metadata when creating new/modified FCS files in R
++ `ParallelAggregate` can use a gating or *FlowSOM* model to only extract a filtered subset of events per file
 + `ParallelNormalize.Train` and `ParallelNormalize.Apply` can use a gating model instead of *FlowSOM* to split samples into compartments for batch effect correction
 
 ## Notes on parallelizing

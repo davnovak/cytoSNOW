@@ -17,6 +17,8 @@ ParallelAggregate(
   guid = "Aggregate.fcs",
   fsom = NULL,
   metacluster = 1,
+  gating_fun = NULL,
+  gate = NULL,
   verbose = TRUE,
   ...
 )
@@ -60,6 +62,13 @@ Defaults to \code{NULL}}
 \item{metacluster}{integer. Metacluster number to extract events, if FlowSOM
 model is specified. Defaults to 1}
 
+\item{gating_fun}{function or \code{NULL}. Takes a \link[flowCore:flowFrame-class]{flowCore::flowFrame} object as
+input and returns a gate label or logical value per event. Defaults to \code{NULL}}
+
+\item{gate}{string or \code{NULL}. Name of gate to retain. If \code{gating_fun} is
+specified but \code{gate} is not given, \code{gating_fun} is expected to output Boolean
+flags, and events that get a \code{TRUE} label are retained. Defaults to \code{NULL}}
+
 \item{verbose}{logical. Whether to indicate progress. Defaults to \code{TRUE}}
 
 \item{...}{optional additional named parameters for \code{\link[flowCore:read.FCS]{flowCore::read.FCS()}}}
@@ -80,9 +89,12 @@ contributes about \code{N/n}, unless one or more files have fewer than \code{N/n
 cells, in which case all their events are taken and the sample sizes for
 other files is increased to make up for this.
 
-If a corresponding FlowSOM model with metaclustering is given, we can choose
-to extract only events that get mapped onto a specific metacluster.
-In this case, up to \code{N/n} events per sample are picked greedily.
+If a corresponding FlowSOM model with metaclustering is given (\code{fsom}), we
+can choose to extract only events that get mapped onto a specific
+metacluster. In this case, up to \code{N/n} events per sample are picked greedily.
+
+If a gating model is given (\code{gating_fun}), we can choose to extract only
+events that get mapped onto a specific
 
 The aggregate gets extra columns: \emph{'File'} with index of FCS file of origin
 per event and \emph{'OriginalIndex'} with index of each event within its FCS file
