@@ -290,11 +290,11 @@ ParallelAggregate <- function(
       rm(ff)
     }
     nd <- nrow(d)
+    s <- min(s_perfile[i], nd)
     idcs <- f_cell_idcs(nd, s)
     if (nd<2) {
       return(f_annotate(d, i, idcs))
     }
-    s <- min(s_perfile[i], nd)
     if (!is.null(seed)) {
       set.seed(seed)
     }
