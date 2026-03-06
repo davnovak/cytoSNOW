@@ -443,7 +443,7 @@ ParallelGetFeatures <- function(
     return(
       list(
         'clusters_counts'                = cl_counts,
-        'clusters_proportion'            = cl_props,
+        'clusters_proportions'           = cl_props,
         'clusters_medians'               = cl_meds,
         'clusters_phenopositivities'     = cl_pheno,
         'metaclusters_counts'            = mcl_counts,
