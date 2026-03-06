@@ -321,7 +321,7 @@ ParallelGetFeatures <- function(
     mcl_counts <- NULL
     mcl_props  <- NULL
     mcl_meds   <- NULL
-    mcl_phen   <- NULL
+    mcl_pheno  <- NULL
     
     ## Compute abundances
 
