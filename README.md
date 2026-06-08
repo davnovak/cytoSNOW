@@ -117,3 +117,11 @@ The more FCS samples you're processing, the more *cytoSNOW* pays off.
 However, in rare cases with very few samples *cytoSNOW* will not accelerate your workflow.
 
 </details>
+
+## To-do's
+
+Points that will be covered in future updates...
+
++ Optimize the way tasks are divided into threads.
+For example, to iterate over *N* files with *C* cores available, create *C* processes each of which process ~*N/C* files; not *N* processes.
+This will reduce the overhead associated with exporting functions for each process.
